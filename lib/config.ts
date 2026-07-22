@@ -28,6 +28,7 @@ export function getApifyConfig() {
         posts: required("APIFY_TIKTOK_POST_ACTOR_ID"),
       },
       linkedin: {
+        profile: required("APIFY_LINKEDIN_PROFILE_ACTOR_ID"),
         posts: required("APIFY_LINKEDIN_POST_ACTOR_ID"),
       },
       socialblade: required("APIFY_SOCIALBLADE_ACTOR_ID"),
