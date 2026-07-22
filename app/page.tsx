@@ -16,9 +16,21 @@ interface CompetitorForm {
   handles: Partial<Record<Platform, string>>;
 }
 
+interface HandleCheck {
+  platform: Platform;
+  role: "target" | "competitor";
+  label: string;
+  handle: string;
+  valid: boolean;
+  followers?: number;
+  error?: string;
+}
+
 function emptyCompetitors(): CompetitorForm[] {
   return [{ name: "", handles: {} }, { name: "", handles: {} }, { name: "", handles: {} }];
 }
+
+type SubmitStage = "idle" | "validating" | "creating";
 
 export default function HomePage() {
   const router = useRouter();
@@ -28,8 +40,9 @@ export default function HomePage() {
   const [platforms, setPlatforms] = useState<Platform[]>(["instagram"]);
   const [targetHandles, setTargetHandles] = useState<Partial<Record<Platform, string>>>({});
   const [competitors, setCompetitors] = useState<CompetitorForm[]>(emptyCompetitors());
-  const [submitting, setSubmitting] = useState(false);
+  const [stage, setStage] = useState<SubmitStage>("idle");
   const [error, setError] = useState<string | null>(null);
+  const submitting = stage !== "idle";
 
   function togglePlatform(platform: Platform) {
     setPlatforms((prev) =>
@@ -50,23 +63,47 @@ export default function HomePage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setSubmitting(true);
+    const payload = { companyName, industry, region, platforms, targetHandles, competitors };
+
     try {
+      setStage("validating");
+      const validateRes = await fetch("/api/validate-handles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const validateData = await validateRes.json();
+      if (!validateRes.ok) {
+        setError(validateData.error ?? "Handle validation failed.");
+        setStage("idle");
+        return;
+      }
+      if (!validateData.allValid) {
+        const invalid = (validateData.results as HandleCheck[]).filter((r) => !r.valid);
+        setError(
+          "Couldn't verify these handles — fix them before running the analysis: " +
+            invalid.map((r) => `${r.label} on ${r.platform} (@${r.handle}): ${r.error}`).join("; "),
+        );
+        setStage("idle");
+        return;
+      }
+
+      setStage("creating");
       const res = await fetch("/api/analyses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyName, industry, region, platforms, targetHandles, competitors }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Something went wrong.");
-        setSubmitting(false);
+        setStage("idle");
         return;
       }
       router.push(`/analyses/${data.id}`);
     } catch {
       setError("Network error — please try again.");
-      setSubmitting(false);
+      setStage("idle");
     }
   }
 
@@ -181,7 +218,11 @@ export default function HomePage() {
           disabled={submitting || platforms.length === 0}
           className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
         >
-          {submitting ? "Starting analysis..." : "Generate reports"}
+          {stage === "validating"
+            ? "Checking handles..."
+            : stage === "creating"
+              ? "Starting analysis..."
+              : "Generate reports"}
         </button>
       </form>
     </main>
