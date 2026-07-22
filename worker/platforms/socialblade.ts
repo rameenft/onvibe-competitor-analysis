@@ -3,34 +3,54 @@ import type { Platform } from "../../lib/types";
 import { aggregateToWeekly, type DailyPoint } from "./util";
 import type { SnapshotData } from "./types";
 
+// Confirmed via a live test run against the configured actor
+// (amrameng/socialblade-scraper): it supports youtube/tiktok/twitch/
+// instagram/facebook only -- no LinkedIn -- so we skip the call entirely
+// for LinkedIn rather than sending an invalid `defaultPlatform`.
+const SUPPORTED_PLATFORMS: Platform[] = ["instagram", "tiktok"];
+
+const SOCIALBLADE_HISTORY_DAYS_CAP = 31;
+
 /**
  * Historical follower-count history for one account, via an Apify-hosted
  * Social Blade scraper actor, collapsed to one point per week.
  *
- * VERIFY BEFORE FIRST REAL RUN: the exact input/output shape of the
- * configured actor (APIFY_SOCIALBLADE_ACTOR_ID) hasn't been confirmed
- * against a live run — this is the highest-uncertainty integration flagged
- * in the build plan. Check the actor's Input/Output tabs on the Apify
- * Console and adjust `run input` and `extractDailyPoints` below if the
- * field names differ. Also confirm Social Blade actually tracks LinkedIn —
- * public documentation only clearly confirms YouTube/Twitch/Instagram/
- * Twitter/TikTok/Facebook coverage, so a `null` return for LinkedIn accounts
- * is an expected data gap, not necessarily a bug.
+ * CONFIRMED LIMITATIONS (from a live test run, not just docs):
+ * 1. Social Blade's daily history is capped at 31 days even when requested,
+ *    not the full 90-day analysis window -- so cumulative growth can only
+ *    ever be historically backfilled for the most recent ~4-5 weeks per run.
+ * 2. In practice, the history array came back EMPTY with a
+ *    "History failed ... UNAUTHORIZED" warning on a real test account --
+ *    Social Blade's historical data appears to require an authenticated
+ *    session this actor doesn't have, not just correct input. So today,
+ *    fetchHistoricalSnapshots will typically return null (a real, expected
+ *    data gap) rather than populated weekly data.
+ * 3. Because of (2), the practical path to real growth data is the
+ *    `apply_profile` fallback snapshot already written every run
+ *    (see worker/pipeline/scrape.ts) -- growth becomes measurable
+ *    organically as this tool gets run repeatedly over successive weeks,
+ *    same as flagged in the very first conversation about this project.
  */
 export async function fetchHistoricalSnapshots(
   platform: Platform,
   handle: string,
   sinceDate: Date,
 ): Promise<SnapshotData[] | null> {
+  if (!SUPPORTED_PLATFORMS.includes(platform)) return null;
+
   const apify = getApifyClient();
   const { actors } = getApifyConfig();
 
   const run = await apify.actor(actors.socialblade).call({
-    username: handle,
-    platform,
+    mode: "profiles",
+    profiles: [handle],
+    defaultPlatform: platform,
+    includeHistory: true,
+    historyDays: SOCIALBLADE_HISTORY_DAYS_CAP,
+    includeGrowth: true,
   });
 
-  const { items } = await apify.dataset(run.defaultDatasetId).listItems({ limit: 1000 });
+  const { items } = await apify.dataset(run.defaultDatasetId).listItems({ limit: 5 });
   if (items.length === 0) return null;
 
   const dailyPoints = extractDailyPoints(items[0] as Record<string, unknown>, sinceDate);
@@ -39,15 +59,12 @@ export async function fetchHistoricalSnapshots(
   return aggregateToWeekly(dailyPoints);
 }
 
+// Confirmed real output field: `history` (array, empty when Social Blade
+// denies the historical request -- see limitation #2 above). Entry shape
+// itself is still a best guess since no populated example has been
+// observed live; adjust field names here if/when one is.
 function extractDailyPoints(item: Record<string, unknown>, sinceDate: Date): DailyPoint[] {
-  const candidateKeys = ["dailyHistory", "history", "daily", "followerHistory", "stats"];
-  let raw: unknown;
-  for (const key of candidateKeys) {
-    if (Array.isArray(item[key])) {
-      raw = item[key];
-      break;
-    }
-  }
+  const raw = item.history;
   if (!Array.isArray(raw)) return [];
 
   const points: DailyPoint[] = [];
