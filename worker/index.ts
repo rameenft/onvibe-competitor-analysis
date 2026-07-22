@@ -3,7 +3,11 @@ import { WORKER_POLL_INTERVAL_MS } from "../lib/config";
 import { scrapeAllAccounts } from "./pipeline/scrape";
 import { classifyAll } from "./pipeline/classify";
 import { computePlatformMetrics } from "./pipeline/metrics";
-import { synthesizePlatformInsights, synthesizeCrossPlatformInsights } from "./pipeline/synthesize";
+import {
+  synthesizePlatformInsights,
+  synthesizeCrossPlatformInsights,
+  synthesizeCustomerReport,
+} from "./pipeline/synthesize";
 import { renderReports } from "./pipeline/render";
 import type { Account, Analysis, Platform } from "../lib/types";
 
@@ -88,7 +92,8 @@ async function runAnalysis(analysis: Analysis): Promise<void> {
     // Always write an 'all' rollup row, even for a single-platform analysis,
     // so report pages can rely on it existing rather than branching on
     // platform count.
-    await synthesizeCrossPlatformInsights(analysis.id, context, perPlatformMetrics);
+    const crossPlatformInsights = await synthesizeCrossPlatformInsights(analysis.id, context, perPlatformMetrics);
+    await synthesizeCustomerReport(analysis.id, context, perPlatformMetrics, crossPlatformInsights);
 
     await updateStatus(analysis.id, "rendering", "Rendering reports...");
     await renderReports(analysis.id);

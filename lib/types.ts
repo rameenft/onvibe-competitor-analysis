@@ -89,6 +89,22 @@ export interface AnalysisInsights {
   created_at: string;
 }
 
+export interface PlanPhase {
+  actions: string[];
+  successMetrics: string[];
+}
+
+// Shape of analysis_reports.content for report_type='customer' — produced
+// by worker/pipeline/synthesize.ts's dedicated customer-report synthesis
+// pass, which doesn't map 1:1 from AnalysisInsights' three-bucket framework.
+export interface CustomerReportContent {
+  key_findings: string[];
+  working_content_patterns: string[];
+  competitive_gaps: string[];
+  experiments: string[];
+  plan: { day30: PlanPhase; day60: PlanPhase; day90: PlanPhase };
+}
+
 export interface AnalysisReport {
   id: string;
   analysis_id: string;
