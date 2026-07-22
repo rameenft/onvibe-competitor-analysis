@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { margin: 2.2cm 1.8cm; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: #0b0b0b;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  h1 { font-size: 20pt; margin-bottom: 0.1em; }
+  h2 {
+    font-size: 10pt; text-transform: uppercase; letter-spacing: 0.04em;
+    color: #2a78d6; margin-top: 1.8em; margin-bottom: 0.3em; border-bottom: 1px solid #e1e0d9; padding-bottom: 0.3em;
+  }
+  h3 { font-size: 13pt; margin-top: 0; margin-bottom: 0.6em; }
+  .meta { color: #52514e; font-size: 9pt; margin-bottom: 1.5em; }
+  table { width: 100%; border-collapse: collapse; margin: 0.8em 0; }
+  th, td { text-align: left; padding: 6px 8px; font-size: 9pt; border-bottom: 1px solid #e1e0d9; }
+  th { background: #f9f9f7; color: #52514e; font-weight: 600; }
+  tr.target-row { background: #eef4fc; font-weight: 600; }
+  .chart { width: 100%; margin: 0.8em 0; }
+  .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0.8em 0; }
+  .swot-box { border: 1px solid #e1e0d9; border-radius: 6px; padding: 10px 12px; }
+  .swot-box h4 { margin: 0 0 6px 0; font-size: 10pt; }
+  .swot-box.strengths h4 { color: #0ca30c; }
+  .swot-box.weaknesses h4 { color: #d03b3b; }
+  .swot-box.opportunities h4 { color: #2a78d6; }
+  .swot-box.threats h4 { color: #eb6834; }
+  .swot-box ul { margin: 0; padding-left: 1.1em; }
+  .rec-group { margin-bottom: 1em; }
+  .rec-group h4 { margin: 0 0 4px 0; font-size: 10pt; color: #52514e; text-transform: uppercase; letter-spacing: 0.03em; }
+  .rec-group ul { margin: 0; padding-left: 1.1em; }
+  .note { color: #898781; font-size: 8.5pt; font-style: italic; }
+  footer { color: #898781; font-size: 8pt; margin-top: 2em; border-top: 1px solid #e1e0d9; padding-top: 0.6em; }
+</style>
+</head>
+<body>
+
+<h1>{{ company_name }} — Instagram Competitive Analysis</h1>
+<div class="meta">
+  {{ industry }} · {{ region }} · Competitor set: {{ accounts|length - 1 }} accounts · Window: last 30 days · Generated {{ generated_at }}
+</div>
+
+<h2>Scoreboard</h2>
+<table>
+  <tr>
+    <th>Account</th><th>Followers</th><th>Engagement Rate</th><th>Avg Likes</th>
+    <th>Avg Comments</th><th>Posts/wk (30d)</th><th>Growth (30d)</th>
+  </tr>
+  {% for a in accounts %}
+  <tr class="{{ 'target-row' if a.role == 'target' else '' }}">
+    <td>{{ '★ ' if a.role == 'target' else '' }}{{ a.handle }}</td>
+    <td>{{ a.followers }}</td>
+    <td>{{ (a.engagement_rate * 100) | round(2) }}%</td>
+    <td>{{ a.avg_likes }}</td>
+    <td>{{ a.avg_comments }}</td>
+    <td>{{ a.posts_per_week }}</td>
+    <td>n/a</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="note">Growth (30d) is not yet available — it requires two snapshots taken 30 days apart, and this report is a single point-in-time run. See recommendations for closing this data gap.</p>
+
+<h2>Chart 1 · Followers vs Engagement Rate</h2>
+<img class="chart" src="{{ chart_followers_vs_engagement }}">
+
+<h2>Chart 2 · Content Volume vs Quality</h2>
+<img class="chart" src="{{ chart_volume_vs_quality }}">
+
+<h2>Chart 3 · Content Category Performance vs Organic Baseline</h2>
+<img class="chart" src="{{ chart_category_performance }}">
+
+<h2>SWOT Analysis</h2>
+<div class="swot-grid">
+  <div class="swot-box strengths">
+    <h4>Strengths</h4>
+    <ul>{% for s in swot.strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+  <div class="swot-box weaknesses">
+    <h4>Weaknesses</h4>
+    <ul>{% for s in swot.weaknesses %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+  <div class="swot-box opportunities">
+    <h4>Opportunities</h4>
+    <ul>{% for s in swot.opportunities %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+  <div class="swot-box threats">
+    <h4>Threats</h4>
+    <ul>{% for s in swot.threats %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+</div>
+
+<h2>Recommendations</h2>
+<div class="rec-group">
+  <h4>Keep doing</h4>
+  <ul>{% for r in recommendations.keep_doing %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+<div class="rec-group">
+  <h4>Things to change — urgent</h4>
+  <ul>{% for r in recommendations.urgent %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+<div class="rec-group">
+  <h4>Things to change — mid-term</h4>
+  <ul>{% for r in recommendations.mid_term %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+<div class="rec-group">
+  <h4>Things to change — long-term</h4>
+  <ul>{% for r in recommendations.long_term %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+
+<footer>
+  Data sources: Apify Instagram scrapers (profile + post data, last 30 days) · Content categorization and narrative synthesis: Claude ·
+  Competitor set limited to up to 5 accounts per analysis.
+</footer>
+
+</body>
+</html>

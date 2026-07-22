@@ -1,0 +1,9 @@
+apify-client
+supabase
+anthropic
+streamlit
+pandas
+matplotlib
+jinja2
+weasyprint
+python-dotenv
