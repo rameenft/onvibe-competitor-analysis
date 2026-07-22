@@ -119,6 +119,8 @@ export interface AccountMetrics {
   avgLikesPercentile: number;
   lowSampleWarning: string | null; // sense-making guard: set when reach is too small to trust the rate
   mediaTypeBreakdown: Record<string, { postCount: number; avgEngagement: number }>;
+  baselineEngagement: number;
+  categoryBreakdown: Record<string, { postCount: number; avgEngagement: number; vsBaselineMultiplier: number | null }>;
   collaborationCadence: { postCount: number; avgEngagement: number; vsBaselineMultiplier: number | null };
 }
 

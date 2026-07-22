@@ -110,6 +110,29 @@ function computeCollaborationCadence(posts: PostRow[]) {
   };
 }
 
+// All content categories vs the account's overall baseline — the full
+// picture (collaborationCadence above is just the collaboration/
+// paid_promotion slice called out on its own).
+function computeCategoryBreakdown(posts: PostRow[], baseline: number) {
+  const byCategory = new Map<string, number[]>();
+  for (const post of posts) {
+    const category = categoryOf(post);
+    if (!category) continue;
+    if (!byCategory.has(category)) byCategory.set(category, []);
+    byCategory.get(category)!.push(post.likes + post.comments);
+  }
+  const result: Record<string, { postCount: number; avgEngagement: number; vsBaselineMultiplier: number | null }> = {};
+  for (const [category, values] of byCategory) {
+    const avgEngagement = average(values);
+    result[category] = {
+      postCount: values.length,
+      avgEngagement: round(avgEngagement),
+      vsBaselineMultiplier: baseline > 0 ? round(avgEngagement / baseline) : null,
+    };
+  }
+  return result;
+}
+
 export async function computeAccountMetrics(account: Account, windowDays: number): Promise<AccountMetrics> {
   const posts = await fetchPosts(account.id);
   const { weeklyGrowth, cumulativeGrowthPct, growthDataGap } = await computeGrowth(account.id, windowDays);
@@ -152,6 +175,8 @@ export async function computeAccountMetrics(account: Account, windowDays: number
     avgLikesPercentile: 0,
     lowSampleWarning,
     mediaTypeBreakdown: computeMediaTypeBreakdown(posts),
+    baselineEngagement: round(average(posts.map((p) => p.likes + p.comments))),
+    categoryBreakdown: computeCategoryBreakdown(posts, average(posts.map((p) => p.likes + p.comments))),
     collaborationCadence: computeCollaborationCadence(posts),
   };
 }
