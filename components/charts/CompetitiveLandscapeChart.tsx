@@ -37,9 +37,9 @@ export function CompetitiveLandscapeChart({ accounts }: Props) {
   const medianEr = median(accounts.map((a) => a.engagementRate * 100));
 
   return (
-    <div style={{ width: "100%", height: 380 }} data-chart="competitive-landscape">
+    <div style={{ width: "100%", height: 420 }} data-chart="competitive-landscape">
       <ResponsiveContainer>
-        <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 20 }}>
+        <ScatterChart margin={{ top: 10, right: 30, bottom: 40, left: 20 }}>
           <CartesianGrid stroke={chrome.gridline} />
           <XAxis
             type="number"
@@ -51,8 +51,8 @@ export function CompetitiveLandscapeChart({ accounts }: Props) {
             stroke={chrome.baseline}
             label={{
               value: "Followers (log scale)",
-              position: "insideBottom",
-              offset: -10,
+              position: "bottom",
+              offset: 0,
               fill: chrome.textSecondary,
               fontSize: 12,
             }}
@@ -81,7 +81,7 @@ export function CompetitiveLandscapeChart({ accounts }: Props) {
               name,
             ]}
           />
-          <Legend wrapperStyle={{ fontSize: 12, color: chrome.textSecondary }} />
+          <Legend verticalAlign="top" height={32} wrapperStyle={{ fontSize: 12, color: chrome.textSecondary }} />
           {accounts.map((account, i) => {
             const color = categoricalColor(i, scheme);
             const isTarget = account.role === "target";
