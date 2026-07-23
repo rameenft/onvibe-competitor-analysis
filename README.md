@@ -8,11 +8,22 @@ three competitors, and produces two reports:
 1. **A detailed report** — full methodology, all charts, and every metric behind the
    findings, split into three explicit sections: **what the data show**, **what we
    believe may explain it**, and **what we recommend testing**.
-2. **A customer-facing report** (OnVibe-branded) — condensed to what a client actually
+   [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
+3. **A customer-facing report** (OnVibe-branded) — condensed to what a client actually
    needs: the 3 most important findings, content patterns that are working, competitive
    gaps, 3-5 experiments to run next, and a 30/60/90-day plan with success metrics.
+   [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
 
 Both are viewable in-browser and downloadable as PDFs.
+
+
+   **Live app**: [onvibe-competitor-analysis.vercel.app](https://onvibe-competitor-analysis.vercel.app/)
+— free to run: the web app is hosted on Vercel's free tier, and the background pipeline
+runs via a scheduled GitHub Actions workflow (`.github/workflows/worker.yml`), which is
+free and unlimited on public repositories. A submitted analysis is picked up within
+about 10 minutes (the workflow's schedule interval) and takes a few more minutes to
+complete.
+
 
 ## The workflow, end to end
 
@@ -53,49 +64,27 @@ platform's scraper actor returns haven't been confirmed against a real run yet, 
 working through the same verification pass Instagram already went through before those
 platforms should be relied on.
 
-### Sample output (real run, OnVibe's own account)
 
-- [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
-- [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
-
-**Live app**: [onvibe-competitor-analysis.vercel.app](https://onvibe-competitor-analysis.vercel.app/)
-— free to run: the web app is hosted on Vercel's free tier, and the background pipeline
-runs via a scheduled GitHub Actions workflow (`.github/workflows/worker.yml`), which is
-free and unlimited on public repositories. A submitted analysis is picked up within
-about 10 minutes (the workflow's schedule interval) and takes a few more minutes to
-complete.
-
-## One known data limitation (not a bug)
+## One known data limitation
 
 The report will show weekly follower growth as an honest "data gap" rather than made-up
 numbers, for now. Reason: no free or paid service reliably has historical follower data
 for an arbitrary, previously-untracked account — I checked both Social Blade and
 HypeAuditor directly against real accounts, and neither had usable history for a
-247K-follower competitor, let alone a small business account. The tool already saves a
+247K-follower competitor, let alone a small business account. I was previously picking up the numbers available on HypeAuditor but I can't do that for a 90 day window or any custom window. The tool already saves a
 snapshot of current followers every time it runs, so real growth becomes visible on its
-own after the same accounts get analyzed a few weeks in a row. There's no fix that
-doesn't involve either waiting for that accumulation or paying for a dedicated
-historical-data API.
+own after the same accounts get analyzed a few weeks in a row. I can't seem to find a fix for this.
 
 ## LLM provider: built on Claude, moving to Gemini
 
 Right now the content classification and report-writing steps run on Claude (Anthropic's
-API). I'm planning to switch this to Gemini, since OnVibe already has its own Gemini
+API). I want to switch this to Gemini, since OnVibe already has its own Gemini
 setup — that means the company can run this fully on its own account instead of a new
 one having to be created just for this tool. The change is contained to three files
 (`lib/anthropic.ts`, `worker/pipeline/classify.ts`, `worker/pipeline/synthesize.ts`) —
 nothing about scraping, metrics, charts, or the reports themselves depends on which
 model is used.
 
-**What "the company owns it" actually requires, technically:** an API key, not a login.
-Someone at OnVibe generates a Gemini API key from their own Google AI Studio / Vertex
-account (under **API Keys** in that console) and gives me that key string. That's a
-separate, revocable credential — not the account password — so nothing about the
-company's actual Google account ever needs to be shared. If access ever needs to be
-cut off, OnVibe deletes that one key from their own dashboard; nothing else is affected.
-The same is true for Apify (an API token from their console) and, if the Supabase
-project moves to a company-owned account, that's a project *transfer* rather than a key
-at all — the database itself moves, not just a credential pointing at it.
 
 ## Tech stack
 
