@@ -53,6 +53,15 @@ platform's scraper actor returns haven't been confirmed against a real run yet, 
 working through the same verification pass Instagram already went through before those
 platforms should be relied on.
 
+### Sample output (real run, OnVibe's own account)
+
+- [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
+- [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
+
+**Live app**: not deployed yet — right now the app only runs locally on a developer's
+machine (`npm run dev` + `npm run worker`). This link will be added once it's hosted
+somewhere with a real, shareable URL.
+
 ## One known data limitation (not a bug)
 
 The report will show weekly follower growth as an honest "data gap" rather than made-up
