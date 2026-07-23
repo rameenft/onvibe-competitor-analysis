@@ -6,7 +6,7 @@ name: Analysis worker
 # once for a pending analysis and exits; see worker/run-once.ts.
 on:
   schedule:
-    - cron: "*/10 * * * *" # every 10 minutes; 5 is GitHub's real minimum
+    - cron: "*/5 * * * *" # every 5 minutes -- GitHub's actual minimum, no cost difference on a public repo
   workflow_dispatch: {} # lets anyone trigger a run manually from the Actions tab
 
 jobs:
