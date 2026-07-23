@@ -1,0 +1,41 @@
+name: Analysis worker
+
+# Free hosting for the background pipeline: GitHub Actions is unlimited on
+# public repos, and a scheduled run can last up to 6 hours -- way more than
+# this pipeline needs (~8 minutes for a typical analysis). Each run checks
+# once for a pending analysis and exits; see worker/run-once.ts.
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every 10 minutes; 5 is GitHub's real minimum
+  workflow_dispatch: {} # lets anyone trigger a run manually from the Actions tab
+
+jobs:
+  run-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run worker:once
+        env:
+          APIFY_API_TOKEN: ${{ secrets.APIFY_API_TOKEN }}
+          APIFY_IG_PROFILE_ACTOR_ID: ${{ secrets.APIFY_IG_PROFILE_ACTOR_ID }}
+          APIFY_IG_POST_ACTOR_ID: ${{ secrets.APIFY_IG_POST_ACTOR_ID }}
+          APIFY_TIKTOK_PROFILE_ACTOR_ID: ${{ secrets.APIFY_TIKTOK_PROFILE_ACTOR_ID }}
+          APIFY_TIKTOK_POST_ACTOR_ID: ${{ secrets.APIFY_TIKTOK_POST_ACTOR_ID }}
+          APIFY_LINKEDIN_PROFILE_ACTOR_ID: ${{ secrets.APIFY_LINKEDIN_PROFILE_ACTOR_ID }}
+          APIFY_LINKEDIN_POST_ACTOR_ID: ${{ secrets.APIFY_LINKEDIN_POST_ACTOR_ID }}
+          APIFY_SOCIALBLADE_ACTOR_ID: ${{ secrets.APIFY_SOCIALBLADE_ACTOR_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_MODEL: ${{ secrets.CLAUDE_MODEL }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
