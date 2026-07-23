@@ -77,8 +77,8 @@ own after the same accounts get analyzed a few weeks in a row. I can't seem to f
 
 ## LLM provider: built on Claude, moving to Gemini
 
-Right now the content classification and report-writing steps run on Claude (Anthropic's
-API). I want to switch this to Gemini, since OnVibe already has its own Gemini
+Right now the content classification and report-writing steps run on Anthropic's
+API. I want to switch this to Gemini, since OnVibe already has its own Gemini
 setup — that means the company can run this fully on its own account instead of a new
 one having to be created just for this tool. The change is contained to three files
 (`lib/anthropic.ts`, `worker/pipeline/classify.ts`, `worker/pipeline/synthesize.ts`) —
