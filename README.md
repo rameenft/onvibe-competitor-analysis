@@ -58,9 +58,12 @@ platforms should be relied on.
 - [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
 - [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
 
-**Live app**: not deployed yet — right now the app only runs locally on a developer's
-machine (`npm run dev` + `npm run worker`). This link will be added once it's hosted
-somewhere with a real, shareable URL.
+**Live app**: [onvibe-competitor-analysis.vercel.app](https://onvibe-competitor-analysis.vercel.app/)
+— free to run: the web app is hosted on Vercel's free tier, and the background pipeline
+runs via a scheduled GitHub Actions workflow (`.github/workflows/worker.yml`), which is
+free and unlimited on public repositories. A submitted analysis is picked up within
+about 10 minutes (the workflow's schedule interval) and takes a few more minutes to
+complete.
 
 ## One known data limitation (not a bug)
 
