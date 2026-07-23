@@ -21,7 +21,7 @@ Both are viewable in-browser and downloadable as PDFs.
 — free to run: the web app is hosted on Vercel's free tier, and the background pipeline
 runs via a scheduled GitHub Actions workflow (`.github/workflows/worker.yml`), which is
 free and unlimited on public repositories. A submitted analysis is picked up within
-about 10 minutes (the workflow's schedule interval) and takes a few more minutes to
+about 5 minutes (the workflow's schedule interval) and takes a few more minutes to
 complete.
 
 
