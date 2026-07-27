@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
 import { MAX_COMPETITORS, PLATFORMS, WINDOW_DAYS } from "@/lib/config";
+import { triggerWorkerDispatch } from "@/lib/github";
 import type { Platform } from "@/lib/types";
 
 interface CompetitorInput {
@@ -102,6 +103,11 @@ export async function POST(request: Request) {
       .eq("id", analysis.id);
     return NextResponse.json({ error: accountsError.message }, { status: 500 });
   }
+
+  // Best-effort nudge so the worker starts within seconds instead of
+  // waiting for its next scheduled tick. Never blocks/fails the response --
+  // the scheduled run is still the fallback if this doesn't work.
+  await triggerWorkerDispatch();
 
   return NextResponse.json({ id: analysis.id });
 }

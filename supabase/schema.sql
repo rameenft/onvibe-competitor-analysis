@@ -10,8 +10,25 @@ create table if not exists analyses (
         check (status in ('pending', 'scraping', 'categorizing', 'computing', 'synthesizing', 'rendering', 'done', 'failed')),
     status_detail text, -- granular progress message shown in the UI
     created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(), -- bumped by trigger below on every change
     completed_at timestamptz
 );
+
+-- Keeps updated_at accurate on every change, so "is this job actually stuck"
+-- can be judged by last activity, not by how old the row is overall -- a
+-- long-running-but-healthy job and a truly stuck one both age the same way
+-- by created_at, but only a stuck one stops updating.
+create or replace function set_updated_at() returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_analyses_updated_at on analyses;
+create trigger trg_analyses_updated_at
+    before update on analyses
+    for each row execute function set_updated_at();
 
 -- Target + competitor accounts, one row per (analysis, platform, handle).
 create table if not exists accounts (

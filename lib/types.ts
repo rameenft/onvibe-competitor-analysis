@@ -31,6 +31,7 @@ export interface Analysis {
   status: AnalysisStatus;
   status_detail: string | null;
   created_at: string;
+  updated_at: string;
   completed_at: string | null;
 }
 

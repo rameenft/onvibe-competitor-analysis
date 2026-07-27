@@ -50,6 +50,15 @@ export function getAnthropicConfig() {
   };
 }
 
+// Optional, not required() -- if unset, the app falls back to relying
+// solely on the scheduled GitHub Actions run (see lib/github.ts).
+export function getGithubDispatchConfig(): { token: string; repo: string } | null {
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  const repo = process.env.GITHUB_REPO;
+  if (!token || !repo) return null;
+  return { token, repo };
+}
+
 export const WORKER_POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS ?? 5000);
 export const APP_BASE_URL = process.env.APP_BASE_URL ?? "http://localhost:3000";
 

@@ -23,6 +23,13 @@ const NON_TERMINAL_STATUSES = ["scraping", "categorizing", "computing", "synthes
 // retry, rather than building full step-checkpointing. Idempotent
 // upserts (posts, snapshots, post_categories) already make a retried run
 // safe to re-run from scratch.
+//
+// Checks updated_at (last activity), not created_at (time of creation) --
+// a healthy run that's simply taking a while ages the same way by
+// created_at as one that's genuinely stuck, and multiple worker runs can
+// now overlap (an instant dispatch on submit, plus the scheduled backup),
+// so this must only flag rows with no *recent* progress, not just rows
+// that happen to be old.
 export async function resetStuckAnalyses(): Promise<void> {
   const supabase = getSupabaseClient();
   const cutoff = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
@@ -33,7 +40,7 @@ export async function resetStuckAnalyses(): Promise<void> {
       status_detail: "Worker restarted mid-run past the stuck-job timeout; retry manually.",
     })
     .in("status", NON_TERMINAL_STATUSES)
-    .lt("created_at", cutoff);
+    .lt("updated_at", cutoff);
 }
 
 export async function claimNextAnalysis(): Promise<Analysis | null> {
