@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { OnVibeLetterhead } from "@/components/reports/OnVibeLetterhead";
+import { ONVIBE_BRAND } from "@/components/reports/brand";
 
 type Platform = "instagram" | "tiktok" | "linkedin";
 
@@ -10,6 +12,10 @@ const PLATFORM_OPTIONS: { value: Platform; label: string }[] = [
   { value: "tiktok", label: "TikTok" },
   { value: "linkedin", label: "LinkedIn" },
 ];
+
+const inputClassName =
+  "rounded border border-neutral-300 px-3 py-2 outline-none transition-colors focus:border-transparent " +
+  "focus:ring-2 dark:border-neutral-700 dark:bg-neutral-900";
 
 interface CompetitorForm {
   name: string;
@@ -108,123 +114,141 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
-      <h1 className="text-2xl font-semibold">Competitive Analysis</h1>
-      <p className="mt-2 text-sm text-neutral-500">
-        Enter your business and up to three competitors. We&apos;ll analyze weekly growth, engagement, content
-        patterns, and collaborations over the last 90 days.
-      </p>
+    <main className="mx-auto max-w-2xl">
+      <OnVibeLetterhead label="New Analysis" />
 
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Your business</h2>
-          <input
-            className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-            placeholder="Company name"
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            required
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-              placeholder="Industry / niche"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              required
-            />
-            <input
-              className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-              placeholder="Location / region"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              required
-            />
-          </div>
-        </section>
+      <div className="px-6 py-12">
+        <h1 className="text-2xl font-semibold">Competitive Analysis</h1>
+        <p className="mt-2 text-sm text-neutral-500">
+          Enter your business and up to three competitors. We&apos;ll analyze weekly growth, engagement, content
+          patterns, and collaborations over the last 90 days.
+        </p>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Platforms to analyze</h2>
-          <div className="flex gap-4">
-            {PLATFORM_OPTIONS.map((option) => (
-              <label key={option.value} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={platforms.includes(option.value)}
-                  onChange={() => togglePlatform(option.value)}
-                />
-                {option.label}
-              </label>
-            ))}
-          </div>
-        </section>
-
-        {platforms.length > 0 && (
+        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8">
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-              Your business&apos;s handles
+            <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.teal }}>
+              Your business
             </h2>
-            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${platforms.length}, 1fr)` }}>
-              {platforms.map((platform) => (
-                <input
-                  key={platform}
-                  className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-                  placeholder={`${platform} handle`}
-                  value={targetHandles[platform] ?? ""}
-                  onChange={(e) => setTargetHandles((prev) => ({ ...prev, [platform]: e.target.value }))}
-                  required
-                />
+            <input
+              className={inputClassName}
+              style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+              placeholder="Company name"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              required
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                className={inputClassName}
+                style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+                placeholder="Industry / niche"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                required
+              />
+              <input
+                className={inputClassName}
+                style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+                placeholder="Location / region"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                required
+              />
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.teal }}>
+              Platforms to analyze
+            </h2>
+            <div className="flex gap-4">
+              {PLATFORM_OPTIONS.map((option) => (
+                <label key={option.value} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={platforms.includes(option.value)}
+                    onChange={() => togglePlatform(option.value)}
+                    style={{ accentColor: ONVIBE_BRAND.teal }}
+                  />
+                  {option.label}
+                </label>
               ))}
             </div>
           </section>
-        )}
 
-        <section className="flex flex-col gap-5">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Three competitors</h2>
-          {competitors.map((competitor, index) => (
-            <div
-              key={index}
-              className="flex flex-col gap-3 rounded border border-neutral-200 p-4 dark:border-neutral-800"
-            >
-              <input
-                className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-                placeholder={`Competitor ${index + 1} name`}
-                value={competitor.name}
-                onChange={(e) => updateCompetitor(index, { name: e.target.value })}
-                required
-              />
-              {platforms.length > 0 && (
-                <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${platforms.length}, 1fr)` }}>
-                  {platforms.map((platform) => (
-                    <input
-                      key={platform}
-                      className="rounded border border-neutral-300 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900"
-                      placeholder={`${platform} handle`}
-                      value={competitor.handles[platform] ?? ""}
-                      onChange={(e) => updateCompetitorHandle(index, platform, e.target.value)}
-                      required
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
+          {platforms.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.teal }}>
+                Your business&apos;s handles
+              </h2>
+              <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${platforms.length}, 1fr)` }}>
+                {platforms.map((platform) => (
+                  <input
+                    key={platform}
+                    className={inputClassName}
+                    style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+                    placeholder={`${platform} handle`}
+                    value={targetHandles[platform] ?? ""}
+                    onChange={(e) => setTargetHandles((prev) => ({ ...prev, [platform]: e.target.value }))}
+                    required
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+          <section className="flex flex-col gap-5">
+            <h2 className="text-sm font-bold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.teal }}>
+              Three competitors
+            </h2>
+            {competitors.map((competitor, index) => (
+              <div
+                key={index}
+                className="flex flex-col gap-3 rounded border border-neutral-200 p-4 dark:border-neutral-800"
+              >
+                <input
+                  className={inputClassName}
+                  style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+                  placeholder={`Competitor ${index + 1} name`}
+                  value={competitor.name}
+                  onChange={(e) => updateCompetitor(index, { name: e.target.value })}
+                  required
+                />
+                {platforms.length > 0 && (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${platforms.length}, 1fr)` }}>
+                    {platforms.map((platform) => (
+                      <input
+                        key={platform}
+                        className={inputClassName}
+                        style={{ "--tw-ring-color": ONVIBE_BRAND.teal } as React.CSSProperties}
+                        placeholder={`${platform} handle`}
+                        value={competitor.handles[platform] ?? ""}
+                        onChange={(e) => updateCompetitorHandle(index, platform, e.target.value)}
+                        required
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
 
-        <button
-          type="submit"
-          disabled={submitting || platforms.length === 0}
-          className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-        >
-          {stage === "validating"
-            ? "Checking handles..."
-            : stage === "creating"
-              ? "Starting analysis..."
-              : "Generate reports"}
-        </button>
-      </form>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={submitting || platforms.length === 0}
+            className="rounded-full px-4 py-2.5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: ONVIBE_BRAND.coral }}
+          >
+            {stage === "validating"
+              ? "Checking handles..."
+              : stage === "creating"
+                ? "Starting analysis..."
+                : "Generate reports"}
+          </button>
+        </form>
+      </div>
     </main>
   );
 }

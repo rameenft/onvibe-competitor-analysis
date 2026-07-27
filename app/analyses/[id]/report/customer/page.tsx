@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { ReportReadyMarker } from "@/components/reports/ReportReadyMarker";
+import { OnVibeLetterhead } from "@/components/reports/OnVibeLetterhead";
 import { ONVIBE_BRAND } from "@/components/reports/brand";
 import type { CustomerReportContent } from "@/lib/types";
 
@@ -96,27 +97,7 @@ export default async function CustomerReportPage({ params, searchParams }: Props
     <main className={`mx-auto max-w-2xl ${isPrint ? "pb-10" : "pb-12"}`}>
       <ReportReadyMarker />
 
-      {/* OnVibe letterhead -- brand belongs on the report chrome, since
-          OnVibe produces this report for its client, not on the client's
-          own name/identity below. */}
-      <div className="flex items-center justify-between px-6 py-5" style={{ backgroundColor: ONVIBE_BRAND.yellow }}>
-        <div className="flex items-center gap-2">
-          <div
-            className="h-0 w-0"
-            style={{
-              borderLeft: "9px solid transparent",
-              borderRight: "9px solid transparent",
-              borderTop: `16px solid ${ONVIBE_BRAND.coral}`,
-            }}
-          />
-          <span className="text-lg font-black tracking-tight" style={{ color: ONVIBE_BRAND.ink }}>
-            OnVibe
-          </span>
-        </div>
-        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.ink }}>
-          Competitive Analysis Report
-        </span>
-      </div>
+      <OnVibeLetterhead label="Competitive Analysis Report" />
 
       <div className="px-6 pt-8">
         {!isPrint && (
