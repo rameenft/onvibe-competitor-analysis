@@ -18,6 +18,11 @@ import { fetchHistoricalSnapshots } from "./socialblade";
  * (a data gap, surfaced explicitly in the report) is the expected outcome
  * here, not necessarily a bug — there may simply be no historical source
  * for LinkedIn follower counts yet.
+ *
+ * No impressions: LinkedIn impressions are a private, admin-only metric --
+ * not obtainable for a competitor's page via public scraping, and
+ * deliberately not modeled here. `shares` (LinkedIn's own "reposts") is the
+ * closest public amplification signal available.
  */
 
 function normalizeMediaType(raw: unknown): MediaType | null {
@@ -66,7 +71,12 @@ export const linkedinAdapter: PlatformAdapter = {
         mediaType: normalizeMediaType(raw.type ?? raw.contentType),
         likes: Number(raw.likeCount ?? raw.reactionCount ?? 0),
         comments: Number(raw.commentCount ?? 0),
+        // LinkedIn calls this "reposts" in its own UI (renamed from
+        // "shares") -- this is the closest public amplification signal to
+        // "impressions", which LinkedIn doesn't expose for pages you don't
+        // administer.
         shares: raw.shareCount != null ? Number(raw.shareCount) : null,
+        views: null, // not a public LinkedIn concept
         postedAt: postedAt.toISOString(),
         coauthorHandle: null, // LinkedIn company posts have no co-author tag equivalent
       });

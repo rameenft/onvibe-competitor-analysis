@@ -14,6 +14,15 @@ export interface PostData {
   likes: number;
   comments: number;
   shares: number | null;
+  // Platform-specific niche metric -- null where a platform doesn't expose
+  // it publicly, not just "unset". TikTok always has this (arguably its
+  // single most important metric, since it's a video-discovery platform);
+  // Instagram exposes it for Reels/videos only. LinkedIn "impressions" are
+  // deliberately NOT modeled here -- that's a private, admin-only metric,
+  // not obtainable for a competitor's page via public scraping. LinkedIn's
+  // repost count (what LinkedIn itself calls "reposts", formerly "shares")
+  // is already carried by the `shares` field above -- not a separate metric.
+  views: number | null;
   postedAt: string; // ISO timestamp
   coauthorHandle: string | null;
 }

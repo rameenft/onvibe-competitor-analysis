@@ -58,6 +58,7 @@ interface PostRow {
   likes: number;
   comments: number;
   shares: number | null;
+  views: number | null;
   media_type: string | null;
   post_categories: { category: string } | { category: string }[] | null;
 }
@@ -66,7 +67,7 @@ async function fetchPosts(accountId: string): Promise<PostRow[]> {
   const supabase = getSupabaseClient();
   const { data } = await supabase
     .from("posts")
-    .select("id, likes, comments, shares, media_type, post_categories(category)")
+    .select("id, likes, comments, shares, views, media_type, post_categories(category)")
     .eq("account_id", accountId);
   return (data ?? []) as unknown as PostRow[];
 }
@@ -143,6 +144,8 @@ export async function computeAccountMetrics(account: Account, windowDays: number
   const avgComments = average(posts.map((p) => p.comments));
   const sharesValues = posts.map((p) => p.shares).filter((s): s is number => s != null);
   const avgShares = sharesValues.length ? average(sharesValues) : null;
+  const viewsValues = posts.map((p) => p.views).filter((v): v is number => v != null);
+  const avgViews = viewsValues.length ? average(viewsValues) : null;
 
   const engagementRate = followers > 0 ? (avgLikes + avgComments + (avgShares ?? 0)) / followers : 0;
   const postsPerWeek = postCount / (windowDays / 7);
@@ -168,11 +171,13 @@ export async function computeAccountMetrics(account: Account, windowDays: number
     avgLikes: round(avgLikes),
     avgComments: round(avgComments),
     avgShares: avgShares != null ? round(avgShares) : null,
+    avgViews: avgViews != null ? round(avgViews) : null,
     engagementRate: round(engagementRate, 4),
     postsPerWeek: round(postsPerWeek),
     engagementRatePercentile: 0, // filled in by attachPercentiles
     followersPercentile: 0,
     avgLikesPercentile: 0,
+    avgViewsPercentile: null,
     lowSampleWarning,
     mediaTypeBreakdown: computeMediaTypeBreakdown(posts),
     baselineEngagement: round(average(posts.map((p) => p.likes + p.comments))),
@@ -188,12 +193,16 @@ function attachPercentiles(accounts: AccountMetrics[]): AccountMetrics[] {
   const engagementRates = accounts.map((a) => a.engagementRate);
   const followerCounts = accounts.map((a) => a.followers);
   const avgLikesValues = accounts.map((a) => a.avgLikes);
+  // Only rank among accounts that actually have a views figure (e.g. a
+  // LinkedIn-only set has none at all, and stays null for everyone).
+  const avgViewsValues = accounts.map((a) => a.avgViews).filter((v): v is number => v != null);
 
   return accounts.map((a) => ({
     ...a,
     engagementRatePercentile: percentileRank(a.engagementRate, engagementRates),
     followersPercentile: percentileRank(a.followers, followerCounts),
     avgLikesPercentile: percentileRank(a.avgLikes, avgLikesValues),
+    avgViewsPercentile: a.avgViews != null ? percentileRank(a.avgViews, avgViewsValues) : null,
   }));
 }
 

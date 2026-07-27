@@ -60,6 +60,11 @@ export const tiktokAdapter: PlatformAdapter = {
         likes: Number(raw.diggCount ?? 0),
         comments: Number(raw.commentCount ?? 0),
         shares: raw.shareCount != null ? Number(raw.shareCount) : null,
+        // playCount (views) is TikTok's single most important metric --
+        // it's a video-discovery platform, so views matter more than likes.
+        // Commonly-documented field name, same unverified-until-live-run
+        // caveat as the rest of this adapter.
+        views: raw.playCount != null ? Number(raw.playCount) : null,
         postedAt: postedAt.toISOString(),
         coauthorHandle: null, // no TikTok equivalent to Instagram's native co-author tag
       });

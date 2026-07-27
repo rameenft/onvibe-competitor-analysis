@@ -65,6 +65,7 @@ export interface Post {
   likes: number;
   comments: number;
   shares: number | null;
+  views: number | null;
   posted_at: string;
   coauthor_handle: string | null;
   scraped_at: string;
@@ -128,11 +129,15 @@ export interface AccountMetrics {
   avgLikes: number;
   avgComments: number;
   avgShares: number | null;
+  // Platform-specific niche metric -- null when the platform doesn't
+  // expose it (LinkedIn). See worker/platforms/types.ts for why.
+  avgViews: number | null;
   engagementRate: number;
   postsPerWeek: number;
   engagementRatePercentile: number;
   followersPercentile: number;
   avgLikesPercentile: number;
+  avgViewsPercentile: number | null;
   lowSampleWarning: string | null; // sense-making guard: set when reach is too small to trust the rate
   mediaTypeBreakdown: Record<string, { postCount: number; avgEngagement: number }>;
   baselineEngagement: number;

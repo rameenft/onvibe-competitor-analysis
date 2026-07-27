@@ -61,6 +61,12 @@ export const instagramAdapter: PlatformAdapter = {
         likes: Number(post.likesCount ?? 0),
         comments: Number(post.commentsCount ?? 0),
         shares: null, // Instagram scrapers don't expose share counts
+        // videoViewCount/videoPlayCount confirmed as real field names from
+        // the actor's own warning logs during the live OnVibe test run --
+        // only present on video/reel posts, null for images/carousels.
+        views: post.videoViewCount != null || post.videoPlayCount != null
+          ? Number(post.videoViewCount ?? post.videoPlayCount)
+          : null,
         postedAt: postedAtOf(post).toISOString(),
         coauthorHandle: firstCoauthor(post),
       }))

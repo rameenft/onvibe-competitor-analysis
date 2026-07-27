@@ -64,6 +64,20 @@ platform's scraper actor returns haven't been confirmed against a real run yet, 
 working through the same verification pass Instagram already went through before those
 platforms should be relied on.
 
+**Platform-specific niche metrics**: rather than forking into a separate pipeline per
+platform, the shared pipeline now carries an optional `views` figure per post —
+populated for TikTok (its single most important metric, since it's a video-discovery
+platform where views matter more than likes) and for Instagram Reels/video content.
+Shown as its own chart and scoreboard column whenever at least one account in the set
+has it. LinkedIn "impressions" were considered and deliberately **not** added — that
+metric is private to each page's own admin and isn't obtainable for a competitor's page
+via public scraping; LinkedIn's `shares` field already captures its closest public
+equivalent (LinkedIn calls that action "reposts" in its own UI).
+
+**Setup note**: this added a `views` column to the `posts` table — run
+`alter table posts add column if not exists views integer;` in the Supabase SQL editor
+before the next real analysis (scraping will fail without it).
+
 
 ## One known data limitation
 

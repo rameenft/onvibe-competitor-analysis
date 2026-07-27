@@ -60,6 +60,7 @@ export async function scrapeAccount(account: Account, windowDays: number): Promi
         likes: p.likes,
         comments: p.comments,
         shares: p.shares,
+        views: p.views,
         posted_at: p.postedAt,
         coauthor_handle: p.coauthorHandle,
       })),

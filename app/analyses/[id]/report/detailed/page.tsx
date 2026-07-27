@@ -6,6 +6,7 @@ import { CompetitiveLandscapeChart } from "@/components/charts/CompetitiveLandsc
 import { WeeklyGrowthChart } from "@/components/charts/WeeklyGrowthChart";
 import { MediaTypeChart } from "@/components/charts/MediaTypeChart";
 import { CategoryPerformanceChart } from "@/components/charts/CategoryPerformanceChart";
+import { ViewsPerformanceChart } from "@/components/charts/ViewsPerformanceChart";
 import type { AccountMetrics, AnalysisInsights, Platform } from "@/lib/types";
 
 interface Props {
@@ -59,6 +60,7 @@ export default async function DetailedReportPage({ params, searchParams }: Props
         const metrics = row.metrics as { platform: Platform; accounts: AccountMetrics[] };
         const growthGapAccount = metrics.accounts.find((a) => a.growthDataGap);
         const lowSampleAccounts = metrics.accounts.filter((a) => a.lowSampleWarning);
+        const hasViews = metrics.accounts.some((a) => a.avgViews != null);
 
         return (
           <section key={row.platform} className="mt-12">
@@ -77,6 +79,7 @@ export default async function DetailedReportPage({ params, searchParams }: Props
                     <th className="py-2 pr-4">Engagement rate</th>
                     <th className="py-2 pr-4">Avg likes</th>
                     <th className="py-2 pr-4">Avg comments</th>
+                    {hasViews && <th className="py-2 pr-4">Avg views</th>}
                     <th className="py-2 pr-4">Posts/wk</th>
                   </tr>
                 </thead>
@@ -108,6 +111,20 @@ export default async function DetailedReportPage({ params, searchParams }: Props
                       </td>
                       <td className="py-2 pr-4">{a.avgLikes}</td>
                       <td className="py-2 pr-4">{a.avgComments}</td>
+                      {hasViews && (
+                        <td className="py-2 pr-4">
+                          {a.avgViews != null ? (
+                            <>
+                              {a.avgViews.toLocaleString()}{" "}
+                              {a.avgViewsPercentile != null && (
+                                <span className="text-neutral-400">(p{a.avgViewsPercentile})</span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-neutral-400">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="py-2 pr-4">{a.postsPerWeek}</td>
                     </tr>
                   ))}
@@ -138,6 +155,20 @@ export default async function DetailedReportPage({ params, searchParams }: Props
               Content type performance
             </h3>
             <MediaTypeChart accounts={metrics.accounts} />
+
+            {hasViews && (
+              <>
+                <h3 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
+                  Views per post
+                </h3>
+                <ViewsPerformanceChart accounts={metrics.accounts} />
+                <p className="mt-1 text-xs italic text-neutral-500">
+                  {row.platform === "tiktok"
+                    ? "TikTok is a video-discovery platform — views measure how many people actually saw a post, independent of who already follows the account."
+                    : "Shown for Instagram accounts with video/Reel content; static image and carousel posts don't carry a public view count."}
+                </p>
+              </>
+            )}
 
             <h3 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
               Category performance vs organic baseline

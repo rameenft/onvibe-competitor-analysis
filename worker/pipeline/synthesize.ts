@@ -48,7 +48,10 @@ output into exactly three buckets, and do not blend them:
 named competitor comparison from the data provided — never generic commentary. If a metric is unavailable (e.g. \
 a growth data gap), say so explicitly rather than guessing or omitting the topic. Never state a raw engagement \
 rate as a sign of strong performance if the data includes a low-sample warning for that account — cite the \
-warning instead.
+warning instead. Where avgViews is present (TikTok, and Instagram video/Reel content), treat it as a reach signal \
+distinct from engagement rate — a post can be widely viewed without proportional likes/comments, and that gap is \
+itself worth calling out. For LinkedIn, do not reference "impressions" — that metric is private to each page's own \
+admin and isn't in this data at all; the closest available signal is shares (LinkedIn's own "reposts").
 
 2. explanations: your best-guess reasoning for WHY the observations might be true. These are hypotheses, not \
 facts — phrase them accordingly ("this may be because...", "a plausible driver is..."). Ground each in the \

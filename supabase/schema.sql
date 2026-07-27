@@ -53,7 +53,8 @@ create table if not exists posts (
     media_type text, -- image | video | reel | carousel | article | document | text
     likes integer not null default 0,
     comments integer not null default 0,
-    shares integer, -- nullable: not all platforms/actors expose this
+    shares integer, -- nullable: not all platforms/actors expose this (LinkedIn's "reposts" lives here)
+    views integer, -- nullable: TikTok always, Instagram Reels/video only, null for LinkedIn
     posted_at timestamptz not null,
     coauthor_handle text, -- native collaborator/co-author tag, if present
     scraped_at timestamptz not null default now(),
