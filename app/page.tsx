@@ -115,7 +115,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto max-w-2xl">
-      <OnVibeLetterhead label="New Analysis" />
+      <OnVibeLetterhead />
 
       <div className="px-6 py-12">
         <h1 className="text-2xl font-semibold">Competitive Analysis</h1>

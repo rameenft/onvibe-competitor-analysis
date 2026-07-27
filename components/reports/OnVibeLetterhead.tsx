@@ -1,7 +1,7 @@
 import { ONVIBE_BRAND } from "./brand";
 
 interface Props {
-  label: string;
+  label?: string;
 }
 
 // Shared brand header -- used on the customer report and the intake form so
@@ -23,9 +23,11 @@ export function OnVibeLetterhead({ label }: Props) {
           OnVibe
         </span>
       </div>
-      <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.ink }}>
-        {label}
-      </span>
+      {label && (
+        <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: ONVIBE_BRAND.ink }}>
+          {label}
+        </span>
+      )}
     </div>
   );
 }
