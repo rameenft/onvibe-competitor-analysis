@@ -50,55 +50,10 @@ complete.
 Everything runs as a background worker process, not inside the web request — so a
 multi-minute pipeline run doesn't time out or block the app.
 
-## Current status
-
-Verified end to end on **Instagram**, with real data — I ran this against OnVibe's real
-Instagram account plus three real competitors (Stanley/Stan, Predis.ai, Ocoya). Real
-scraping, real Claude classification, real synthesis, real PDFs — all confirmed working,
-including edge cases like an account with zero posts in the window and low-sample
-engagement warnings.
-
-**TikTok and LinkedIn support is built (same pipeline, same UI, same reports), and I'm
-currently in the process of testing it against live data** — the exact field names each
-platform's scraper actor returns haven't been confirmed against a real run yet, so I'm
-working through the same verification pass Instagram already went through before those
-platforms should be relied on.
-
-**Platform-specific niche metrics**: rather than forking into a separate pipeline per
-platform, the shared pipeline now carries an optional `views` figure per post —
-populated for TikTok (its single most important metric, since it's a video-discovery
-platform where views matter more than likes) and for Instagram Reels/video content.
-Shown as its own chart and scoreboard column whenever at least one account in the set
-has it. LinkedIn "impressions" were considered and deliberately **not** added — that
-metric is private to each page's own admin and isn't obtainable for a competitor's page
-via public scraping; LinkedIn's `shares` field already captures its closest public
-equivalent (LinkedIn calls that action "reposts" in its own UI).
 
 **Setup note**: this added a `views` column to the `posts` table — run
 `alter table posts add column if not exists views integer;` in the Supabase SQL editor
 before the next real analysis (scraping will fail without it).
-
-
-## One known data limitation
-
-The report will show weekly follower growth as an honest "data gap" rather than made-up
-numbers, for now. Reason: no free or paid service reliably has historical follower data
-for an arbitrary, previously-untracked account — I checked both Social Blade and
-HypeAuditor directly against real accounts, and neither had usable history for a
-247K-follower competitor, let alone a small business account. I was previously picking up the numbers available on HypeAuditor but I can't do that for a 90 day window or any custom window. The tool already saves a
-snapshot of current followers every time it runs, so real growth becomes visible on its
-own after the same accounts get analyzed a few weeks in a row. I can't seem to find a fix for this.
-
-## LLM provider: built on Claude, moving to Gemini
-
-Right now the content classification and report-writing steps run on Anthropic's
-API. I want to switch this to Gemini, since OnVibe already has its own Gemini
-setup — that means the company can run this fully on its own account instead of a new
-one having to be created just for this tool. The change is contained to three files
-(`lib/anthropic.ts`, `worker/pipeline/classify.ts`, `worker/pipeline/synthesize.ts`) —
-nothing about scraping, metrics, charts, or the reports themselves depends on which
-model is used.
-
 
 ## Tech stack
 
@@ -112,13 +67,6 @@ model is used.
   synthesis
 - **Playwright** — renders the live report pages to PDF
 
-## What it costs to run
-
-- **Apify**: pay-as-you-go, free tier gives $5/month in credits
-- **LLM (Claude today, Gemini planned)**: a single analysis run costs well under $1 in
-  usage either way; Gemini's own free tier may be usable depending on which Gemini
-  account/plan OnVibe already has
-- **Supabase**: free tier is enough for this scale
 
 ## Repo structure
 
