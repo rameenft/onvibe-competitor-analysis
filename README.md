@@ -18,11 +18,6 @@ Both are viewable in-browser and downloadable as PDFs.
 
 
    **Live app**: [onvibe-competitor-analysis.vercel.app](https://onvibe-competitor-analysis.vercel.app/)
-— free to run: the web app is hosted on Vercel's free tier, and the background pipeline
-runs via a scheduled GitHub Actions workflow (`.github/workflows/worker.yml`), which is
-free and unlimited on public repositories. A submitted analysis is picked up within
-about 5 minutes (the workflow's schedule interval) and takes a few more minutes to
-complete.
 
 
 ## The workflow, end to end
