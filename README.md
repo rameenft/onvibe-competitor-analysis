@@ -28,15 +28,17 @@ Both are viewable in-browser and downloadable as PDFs.
    against the real platform to confirm it resolves to an actual account. A typo'd or
    wrong handle fails immediately with a clear error, instead of wasting a full paid run.
 3. **Scraping** (Apify) — profile data and the last 90 days of posts for every account.
-4. **Content classification** (Claude) — every post is tagged into one category:
+4. **Content classification** (Gemini) — every post is tagged into one category:
    collaboration, campaign, paid promotion, product, testimonial, educational, or other.
+   The prompt (`prompts/classify.json`) defines each category and gives ordered
+   tie-break rules for posts that fit more than one.
 5. **Metrics** — engagement rate, percentile rank against the competitor set, weekly
    growth, media-type performance (reels vs. photos vs. carousel), and collaboration
    cadence vs. each account's own organic baseline. Includes a built-in "sense-making"
    guard: an account with a high engagement rate but a tiny audience or a handful of
    interactions gets flagged as low-sample, so a small account never reads as
    "outperforming" when it's really just a thin sample.
-6. **Synthesis** (Claude) — turns the metrics into the data/explanation/recommendation
+6. **Synthesis** (Gemini) — turns the metrics into the data/explanation/recommendation
    writeup for the detailed report, plus a separate pass that produces the condensed
    customer-report structure.
 7. **PDF rendering** (Playwright) — captures the live report pages and uploads both PDFs
@@ -77,10 +79,10 @@ Setup, commands and full results are in [ml/README.md](ml/README.md).
   generated reports
 - **Apify** — scraping (Instagram/TikTok/LinkedIn actors + a Social Blade actor for
   growth history)
-- **Claude (Anthropic API)**, moving to **Gemini** — content classification and report
+- **Gemini** (`gemini-3.8-flash`, Google GenAI SDK) — content classification and report
   synthesis
 - **Playwright** — renders the live report pages to PDF
-- **Python + Gemini** — the `ml/` evals and knowledge graph (networkx, rapidfuzz)
+- **Python** — the `ml/` evals and knowledge graph (networkx, rapidfuzz)
 
 
 ## Repo structure
@@ -105,7 +107,7 @@ worker/                     The background pipeline (a separate always-on proces
 lib/                        Shared code used by both app/ and worker/
   config.ts                    Environment variable loading
   supabase.ts, apify.ts,
-  anthropic.ts                 API client setup for each service
+  gemini.ts                    API client setup for each service
   types.ts                     Shared TypeScript types (database rows, metrics shapes)
 
 components/

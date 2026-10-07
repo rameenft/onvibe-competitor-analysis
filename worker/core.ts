@@ -88,7 +88,7 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
     await updateStatus(analysis.id, "scraping", "Scraping profiles, posts, and historical growth...");
     await scrapeAllAccounts(accountList, analysis.window_days);
 
-    await updateStatus(analysis.id, "categorizing", "Classifying post content with Claude...");
+    await updateStatus(analysis.id, "categorizing", "Classifying post content with Gemini...");
     await classifyAll(accountList.map((a) => a.id));
 
     await updateStatus(analysis.id, "computing", "Computing metrics...");
@@ -96,7 +96,7 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
       platforms.map((platform) => computePlatformMetrics(accountList, platform, analysis.window_days)),
     );
 
-    await updateStatus(analysis.id, "synthesizing", "Synthesizing insights with Claude...");
+    await updateStatus(analysis.id, "synthesizing", "Synthesizing insights with Gemini...");
     for (const metrics of perPlatformMetrics) {
       await synthesizePlatformInsights(analysis.id, metrics.platform, context, metrics);
     }

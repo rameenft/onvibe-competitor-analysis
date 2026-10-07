@@ -210,7 +210,7 @@ export default async function DetailedReportPage({ params, searchParams }: Props
 
       <footer className="mt-12 border-t border-neutral-200 pt-4 text-xs text-neutral-400 dark:border-neutral-800">
         Data sources: Apify scrapers (profile, posts, historical growth via Social Blade) · Content categorization
-        and narrative synthesis: Claude · Competitor set: target + up to 3 competitors per platform.
+        and narrative synthesis: Gemini · Competitor set: target + up to 3 competitors per platform.
       </footer>
     </main>
   );

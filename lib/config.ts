@@ -43,10 +43,11 @@ export function getSupabaseConfig() {
   };
 }
 
-export function getAnthropicConfig() {
+export function getGeminiConfig() {
   return {
-    apiKey: required("ANTHROPIC_API_KEY"),
-    model: process.env.CLAUDE_MODEL ?? "claude-sonnet-5",
+    apiKey: required("GEMINI_API_KEY"),
+    // `||`, not `??`: an unset GitHub Actions secret arrives as an empty string.
+    model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
   };
 }
 

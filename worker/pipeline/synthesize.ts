@@ -1,4 +1,4 @@
-import { getAnthropicClient, getAnthropicConfig } from "../../lib/anthropic";
+import { generateStructured } from "../../lib/gemini";
 import { getSupabaseClient } from "../../lib/supabase";
 import type { AccountMetrics, CustomerReportContent, Platform } from "../../lib/types";
 
@@ -75,23 +75,7 @@ interface Insights {
 }
 
 async function callSynthesisTool(prompt: string): Promise<Insights> {
-  const anthropic = getAnthropicClient();
-  const { model } = getAnthropicConfig();
-
-  const message = await anthropic.messages.create({
-    model,
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    tools: [INSIGHTS_TOOL],
-    tool_choice: { type: "tool", name: "produce_insights" },
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const toolUse = message.content.find((block) => block.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") {
-    return { data_observations: [], explanations: [], recommendations: [] };
-  }
-  return toolUse.input as Insights;
+  return generateStructured<Insights>(SYSTEM_PROMPT, INSIGHTS_TOOL.input_schema, prompt, INSIGHTS_TOOL.name);
 }
 
 export async function synthesizePlatformInsights(
@@ -198,29 +182,12 @@ what worked; day 90 should be a clear checkpoint on whether the strategy is work
 Keep every bullet short — one sentence each.`;
 
 async function callCustomerReportTool(prompt: string): Promise<CustomerReportContent> {
-  const anthropic = getAnthropicClient();
-  const { model } = getAnthropicConfig();
-
-  const message = await anthropic.messages.create({
-    model,
-    max_tokens: 4096,
-    system: CUSTOMER_SYSTEM_PROMPT,
-    tools: [CUSTOMER_REPORT_TOOL],
-    tool_choice: { type: "tool", name: "produce_customer_report" },
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const toolUse = message.content.find((block) => block.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") {
-    return {
-      key_findings: [],
-      working_content_patterns: [],
-      competitive_gaps: [],
-      experiments: [],
-      plan: { day30: { actions: [], successMetrics: [] }, day60: { actions: [], successMetrics: [] }, day90: { actions: [], successMetrics: [] } },
-    };
-  }
-  return toolUse.input as CustomerReportContent;
+  return generateStructured<CustomerReportContent>(
+    CUSTOMER_SYSTEM_PROMPT,
+    CUSTOMER_REPORT_TOOL.input_schema,
+    prompt,
+    CUSTOMER_REPORT_TOOL.name,
+  );
 }
 
 export async function synthesizeCustomerReport(

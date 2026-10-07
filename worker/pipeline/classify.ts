@@ -1,12 +1,11 @@
-import type Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, getAnthropicConfig } from "../../lib/anthropic";
+import { generateStructured } from "../../lib/gemini";
 import classifyPrompt from "../../prompts/classify.json";
 import { getSupabaseClient } from "../../lib/supabase";
 import type { PostCategory } from "../../lib/types";
 
 // The prompt and tool schema live in prompts/classify.json so the Python
 // eval harness (ml/onvibe_ml/evals) scores exactly what production runs.
-const CLASSIFY_TOOL = classifyPrompt.tool as Anthropic.Tool;
+const CLASSIFY_SCHEMA = classifyPrompt.tool.input_schema;
 const SYSTEM_PROMPT = classifyPrompt.system;
 
 interface Classification {
@@ -23,25 +22,17 @@ function chunk<T>(items: T[], size: number): T[][] {
 }
 
 async function classifyChunk(posts: { id: string; caption: string | null; coauthor_handle: string | null }[]) {
-  const anthropic = getAnthropicClient();
-  const { model } = getAnthropicConfig();
-
   const postLines = posts.map(
     (p) => `post_id: ${p.id}\ncoauthor_tag: ${p.coauthor_handle ?? "none"}\ncaption: ${p.caption ?? "(no caption)"}`,
   );
 
-  const message = await anthropic.messages.create({
-    model,
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    tools: [CLASSIFY_TOOL],
-    tool_choice: { type: "tool", name: "classify_posts" },
-    messages: [{ role: "user", content: postLines.join("\n\n---\n\n") }],
-  });
-
-  const toolUse = message.content.find((block) => block.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") return [];
-  return (toolUse.input as { classifications: Classification[] }).classifications;
+  const result = await generateStructured<{ classifications: Classification[] }>(
+    SYSTEM_PROMPT,
+    CLASSIFY_SCHEMA,
+    postLines.join("\n\n---\n\n"),
+    "classify_posts",
+  );
+  return result.classifications;
 }
 
 export async function classifyPostsForAccount(accountId: string): Promise<void> {
@@ -54,11 +45,11 @@ export async function classifyPostsForAccount(accountId: string): Promise<void> 
   if (!posts || posts.length === 0) return;
 
   // Chunked so a high-post-volume account across a 90-day, multi-platform
-  // window doesn't risk overflowing a single request's context.
-  const allClassifications: Classification[] = [];
-  for (const batch of chunk(posts, 40)) {
-    allClassifications.push(...(await classifyChunk(batch)));
-  }
+  // window doesn't risk overflowing a single request's context. Chunks run in
+  // parallel: Gemini takes over a minute per 40-post chunk, and run one at a
+  // time a typical analysis would approach the workflow's 30-minute timeout.
+  const results = await Promise.all(chunk(posts, 40).map((batch) => classifyChunk(batch)));
+  const allClassifications = results.flat();
 
   if (allClassifications.length === 0) return;
 
@@ -74,7 +65,5 @@ export async function classifyPostsForAccount(accountId: string): Promise<void> 
 }
 
 export async function classifyAll(accountIds: string[]): Promise<void> {
-  for (const accountId of accountIds) {
-    await classifyPostsForAccount(accountId);
-  }
+  await Promise.all(accountIds.map((accountId) => classifyPostsForAccount(accountId)));
 }
