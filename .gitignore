@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .venv/
+# ml/ caches LLM outputs (re-creatable, and costly to regenerate only if deleted)
+ml/.cache/
 legacy-streamlit-prototype/output/*.pdf
 legacy-streamlit-prototype/output/*.png
 

@@ -100,6 +100,22 @@ nothing about scraping, metrics, charts, or the reports themselves depends on wh
 model is used.
 
 
+## Evals and knowledge graph (`ml/`, Python)
+
+A Python layer that checks whether the LLM steps are right, and builds a knowledge graph from the
+scraped posts:
+
+- **Grounding check**: every number in the generated insights is traced back to the metrics the
+  model was given (78/78 claims grounded on real runs; the checker catches 95% of injected fakes).
+- **Classifier eval**: hand labels, stratum-reweighted accuracy and F1, confidence calibration, and
+  side-by-side model comparison on the exact production prompt (`prompts/classify.json`, shared
+  with the TypeScript worker).
+- **Knowledge graph**: LLM entity extraction with a hallucination guardrail, auditable entity
+  resolution, and a temporal graph (`supabase/kg_schema.sql`) for questions like topic gaps vs
+  competitors.
+
+See [ml/README.md](ml/README.md).
+
 ## Tech stack
 
 - **Next.js (TypeScript)** — the web app (form, status page, both report pages)

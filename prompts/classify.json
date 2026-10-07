@@ -1,0 +1,62 @@
+{
+  "version": "classify-v1",
+  "categories": [
+    "collaboration",
+    "campaign",
+    "paid_promotion",
+    "product",
+    "testimonial",
+    "educational",
+    "other"
+  ],
+  "system": "You are classifying social media posts (Instagram, TikTok, or LinkedIn) for a competitive analysis report.\nA tagged co-author alone does not automatically mean paid influencer marketing — read the\ncaption for signals of employee advocacy, institutional partnership, or genuine collaboration\nbefore defaulting to \"collaboration\" vs \"paid_promotion\". Only use \"paid_promotion\" when the\ncaption or a coauthor tag clearly signals sponsorship (e.g. \"Paid partnership\", \"#ad\", explicit\nsponsorship language). Keep rationale to one sentence.",
+  "tool": {
+    "name": "classify_posts",
+    "description": "Classify each social media post into exactly one content category.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "classifications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "post_id": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "collaboration",
+                  "campaign",
+                  "paid_promotion",
+                  "product",
+                  "testimonial",
+                  "educational",
+                  "other"
+                ]
+              },
+              "confidence": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "post_id",
+              "category",
+              "confidence",
+              "rationale"
+            ]
+          }
+        }
+      },
+      "required": [
+        "classifications"
+      ]
+    }
+  }
+}
