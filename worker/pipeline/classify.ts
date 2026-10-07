@@ -1,49 +1,13 @@
+import type Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, getAnthropicConfig } from "../../lib/anthropic";
+import classifyPrompt from "../../prompts/classify.json";
 import { getSupabaseClient } from "../../lib/supabase";
 import type { PostCategory } from "../../lib/types";
 
-const CATEGORIES: PostCategory[] = [
-  "collaboration",
-  "campaign",
-  "paid_promotion",
-  "product",
-  "testimonial",
-  "educational",
-  "other",
-];
-
-// Same tool-use pattern as the Python prototype's pipeline/categorize.py,
-// ported to the Anthropic TS SDK.
-const CLASSIFY_TOOL = {
-  name: "classify_posts",
-  description: "Classify each social media post into exactly one content category.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      classifications: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            post_id: { type: "string" },
-            category: { type: "string", enum: CATEGORIES },
-            confidence: { type: "number", minimum: 0, maximum: 1 },
-            rationale: { type: "string" },
-          },
-          required: ["post_id", "category", "confidence", "rationale"],
-        },
-      },
-    },
-    required: ["classifications"],
-  },
-};
-
-const SYSTEM_PROMPT = `You are classifying social media posts (Instagram, TikTok, or LinkedIn) for a competitive analysis report.
-A tagged co-author alone does not automatically mean paid influencer marketing — read the
-caption for signals of employee advocacy, institutional partnership, or genuine collaboration
-before defaulting to "collaboration" vs "paid_promotion". Only use "paid_promotion" when the
-caption or a coauthor tag clearly signals sponsorship (e.g. "Paid partnership", "#ad", explicit
-sponsorship language). Keep rationale to one sentence.`;
+// The prompt and tool schema live in prompts/classify.json so the Python
+// eval harness (ml/onvibe_ml/evals) scores exactly what production runs.
+const CLASSIFY_TOOL = classifyPrompt.tool as Anthropic.Tool;
+const SYSTEM_PROMPT = classifyPrompt.system;
 
 interface Classification {
   post_id: string;

@@ -50,6 +50,25 @@ multi-minute pipeline run doesn't time out or block the app.
 `alter table posts add column if not exists views integer;` in the Supabase SQL editor
 before the next real analysis (scraping will fail without it).
 
+## Evals and knowledge graph (`ml/`, Python, runs on Gemini)
+
+A Python layer on top of the pipeline. It reads the same Supabase tables the worker writes, runs on
+Gemini (`gemini-3.8-flash`), and adds two things the pipeline didn't have:
+
+- **Grounding check**: every number in the generated insights is traced back to the metrics the
+  model was given. On real runs, 78 of 78 numeric claims were grounded and none were made up, and
+  the checker itself catches 95% of deliberately injected fake numbers.
+- **Classifier checks**: the post-classification prompt now lives in one shared file
+  (`prompts/classify.json`), read by both the TypeScript worker and the Python evals, so the evals
+  test exactly what production runs. Re-classifying the same posts twice agreed 93.4% of the time.
+- **Knowledge graph**: LLM entity extraction (topics, people, brands) with a guardrail that drops
+  any entity not quoted verbatim from the caption, auditable entity resolution, and a graph stored
+  in Supabase (`supabase/kg_schema.sql`). Built from 732 real posts: 2,677 nodes and 6,903 edges,
+  for $0.44. It answers questions the flat metrics can't, such as which topics competitors do well
+  with that the target never posts about.
+
+Setup, commands and full results are in [ml/README.md](ml/README.md).
+
 ## Tech stack
 
 - **Next.js (TypeScript)** — the web app (form, status page, both report pages)
@@ -61,6 +80,7 @@ before the next real analysis (scraping will fail without it).
 - **Claude (Anthropic API)**, moving to **Gemini** — content classification and report
   synthesis
 - **Playwright** — renders the live report pages to PDF
+- **Python + Gemini** — the `ml/` evals and knowledge graph (networkx, rapidfuzz)
 
 
 ## Repo structure
@@ -93,7 +113,15 @@ components/
   reports/                     Report-page building blocks, including OnVibe's brand
                                colors (brand.ts) and the PDF-capture readiness marker
 
+prompts/classify.json        The post-classification prompt, shared by worker/ and ml/
+
+ml/                          Python evals and knowledge graph (see ml/README.md)
+  onvibe_ml/evals/             Grounding check and classifier eval
+  onvibe_ml/kg/                Entity extraction, resolution, graph build and queries
+  reports/                     Generated results (grounding, classifier, graph summary)
+
 supabase/schema.sql          The full database schema
+supabase/kg_schema.sql       Knowledge-graph tables (nodes, edges, aliases)
 
 legacy-streamlit-prototype/  The original Python/Streamlit prototype (kept for
                              reference, not part of the running app)
