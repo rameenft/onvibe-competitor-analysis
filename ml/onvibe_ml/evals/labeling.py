@@ -91,7 +91,7 @@ def label_interactively() -> None:
     posts = {p["id"]: p for p in corpus["posts"]}
     accounts = corpus["accounts"]
 
-    new_file = not GOLD_PATH.exists()
+    new_file = not GOLD_PATH.exists() or GOLD_PATH.stat().st_size == 0
     with GOLD_PATH.open("a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=GOLD_FIELDS)
         if new_file:

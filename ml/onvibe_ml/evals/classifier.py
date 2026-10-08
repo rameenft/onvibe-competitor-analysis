@@ -11,13 +11,15 @@ import random
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-from ..config import CACHE_DIR, REPORTS_DIR, load_classify_prompt
+from ..config import CACHE_DIR, DATA_DIR, REPORTS_DIR, load_classify_prompt
 from ..db import load_corpus
 from ..llm import Usage, call_tool
 from . import metrics
 from .labeling import SKIP, read_gold, unique_posts
 
 BATCH_SIZE = 40  # same chunk size as worker/pipeline/classify.ts
+# Gemini's output budget includes thinking tokens; matches MAX_OUTPUT_TOKENS in lib/gemini.ts.
+GEMINI_MAX_OUTPUT_TOKENS = 65536
 
 
 def classify_with_model(model: str, posts: list[dict]) -> tuple[dict[str, dict], Usage]:
@@ -38,10 +40,10 @@ def classify_with_model(model: str, posts: list[dict]) -> tuple[dict[str, dict],
     def run(batch: list[dict]) -> list[dict]:
         # Same per-post layout as classifyChunk() in the TypeScript worker.
         content = "\n\n---\n\n".join(
-            f"post_id: {p['id']}\ncoauthor_tag: {p['coauthor_handle'] or 'none'}\ncaption: {p['caption'] or '(no caption)'}"
+            f"post_id: {p['id']}\naccount: @{p.get('account_handle', 'unknown')}\ncoauthor_tag: {p['coauthor_handle'] or 'none'}\ncaption: {p['caption'] or '(no caption)'}"
             for p in batch
         )
-        result = call_tool(model, prompt["system"], prompt["tool"], content, usage, max_tokens=8192)
+        result = call_tool(model, prompt["system"], prompt["tool"], content, usage, max_tokens=8192 if model.startswith("claude") else GEMINI_MAX_OUTPUT_TOKENS)
         wanted = {p["id"] for p in batch}
         return [c for c in result.get("classifications", []) if c.get("post_id") in wanted]
 
@@ -52,6 +54,29 @@ def classify_with_model(model: str, posts: list[dict]) -> tuple[dict[str, dict],
                     f.write(json.dumps(row) + "\n")
                     cached[row["post_id"]] = row
     return cached, usage
+
+
+def with_handle(post: dict, corpus: dict) -> dict:
+    """Post plus its account's handle, which the prompt shows so the model can spot self-tags."""
+    return {**post, "account_handle": corpus["accounts"][post["account_id"]]["handle"]}
+
+
+def split_table(results: list[dict], gold: list[dict], predictions: dict[str, dict], weights: dict, labels: list[str]) -> list[str]:
+    """Accuracy on the tuning labels vs the locked holdout (data/holdout_ids.txt), per source."""
+    path = DATA_DIR / "holdout_ids.txt"
+    if not path.exists():
+        return []
+    holdout = set(path.read_text().split())
+    lines = ["## Tuning set vs locked holdout", "",
+             "The holdout labels were not looked at while the prompt was edited, so it is the honest number.", "",
+             "| Source | Tuning accuracy | n | Holdout accuracy | n |", "| --- | --- | --- | --- | --- |"]
+    for source, preds in predictions.items():
+        cells = []
+        for subset in ([r for r in gold if r["post_id"] not in holdout], [r for r in gold if r["post_id"] in holdout]):
+            r = score(source, subset, preds, weights, labels)
+            cells += [_pct(r["accuracy"]), str(r["n"])]
+        lines.append(f"| {source} | " + " | ".join(cells) + " |")
+    return lines + [""]
 
 
 def stratum_weights(corpus: dict, gold: list[dict]) -> dict[str, float]:
@@ -204,12 +229,14 @@ def run(models: list[str]) -> str:
     production = {pid: corpus["categories"][pid] for pid in (r["post_id"] for r in gold)}
     results = [score("production", gold, production, weights, labels)]
     agreements, costs = {}, {}
+    all_predictions = {"production": production}
 
     posts_by_id = {p["id"]: p for p in corpus["posts"]}
-    gold_posts = [posts_by_id[r["post_id"]] for r in gold]
+    gold_posts = [with_handle(posts_by_id[r["post_id"]], corpus) for r in gold]
     for model in models:
         predictions, usage = classify_with_model(model, gold_posts)
         results.append(score(model, gold, predictions, weights, labels))
+        all_predictions[model] = predictions
         shared = [r["post_id"] for r in gold if r["post_id"] in predictions]
         agreements[model] = metrics.agreement(
             [production[p]["category"] for p in shared], [predictions[p]["category"] for p in shared]
@@ -217,6 +244,10 @@ def run(models: list[str]) -> str:
         costs[model] = usage.summary(model) if usage.calls else "cached"
 
     report = render(results, labels, consistency, agreements, costs)
+    extra = split_table(results, gold, all_predictions, weights, labels)
+    if extra:
+        head, sep, rest = report.partition("\n## Production self-consistency")
+        report = head + "\n" + "\n".join(extra) + sep + rest
     REPORTS_DIR.mkdir(exist_ok=True)
     (REPORTS_DIR / "classifier_eval.md").write_text(report + "\n")
     return report
@@ -226,7 +257,7 @@ def run_agreement(model: str, sample_size: int, seed: int = 7) -> str:
     """Label-free comparison: how often does `model` agree with production on a random sample?"""
     corpus = load_corpus()
     posts = unique_posts(corpus)
-    sample = random.Random(seed).sample(posts, min(sample_size, len(posts)))
+    sample = [with_handle(p, corpus) for p in random.Random(seed).sample(posts, min(sample_size, len(posts)))]
     predictions, usage = classify_with_model(model, sample)
     shared = [p["id"] for p in sample if p["id"] in predictions]
     production = [corpus["categories"][p]["category"] for p in shared]
