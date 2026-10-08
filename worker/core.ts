@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "../lib/supabase";
+import { assertOk, getSupabaseClient } from "../lib/supabase";
 import { scrapeAllAccounts } from "./pipeline/scrape";
 import { classifyAll } from "./pipeline/classify";
 import { computePlatformMetrics } from "./pipeline/metrics";
@@ -13,11 +13,6 @@ import type { Account, Analysis, Platform } from "../lib/types";
 const STUCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const NON_TERMINAL_STATUSES = ["scraping", "categorizing", "computing", "synthesizing", "rendering"];
 
-// Shared by both execution modes: worker/index.ts (an always-on process,
-// for local dev / a persistent host) and worker/run-once.ts (a single
-// claim-and-run cycle, for a scheduled runner like GitHub Actions that has
-// no persistent process to poll in a loop).
-
 // Crash recovery, kept intentionally cheap: anything stuck in a
 // non-terminal status past the timeout gets marked failed for a manual
 // retry, rather than building full step-checkpointing. Idempotent
@@ -26,21 +21,22 @@ const NON_TERMINAL_STATUSES = ["scraping", "categorizing", "computing", "synthes
 //
 // Checks updated_at (last activity), not created_at (time of creation) --
 // a healthy run that's simply taking a while ages the same way by
-// created_at as one that's genuinely stuck, and multiple worker runs can
-// now overlap (an instant dispatch on submit, plus the scheduled backup),
-// so this must only flag rows with no *recent* progress, not just rows
-// that happen to be old.
+// created_at as one that's genuinely stuck, so this must only flag rows
+// with no *recent* progress, not just rows that happen to be old.
 export async function resetStuckAnalyses(): Promise<void> {
   const supabase = getSupabaseClient();
   const cutoff = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
-  await supabase
-    .from("analyses")
-    .update({
-      status: "failed",
-      status_detail: "Worker restarted mid-run past the stuck-job timeout; retry manually.",
-    })
-    .in("status", NON_TERMINAL_STATUSES)
-    .lt("updated_at", cutoff);
+  assertOk(
+    await supabase
+      .from("analyses")
+      .update({
+        status: "failed",
+        status_detail: "Worker restarted mid-run past the stuck-job timeout; retry manually.",
+      })
+      .in("status", NON_TERMINAL_STATUSES)
+      .lt("updated_at", cutoff),
+    "Resetting stuck analyses",
+  );
 }
 
 export async function claimNextAnalysis(): Promise<Analysis | null> {
@@ -70,13 +66,19 @@ export async function claimNextAnalysis(): Promise<Analysis | null> {
 
 async function updateStatus(analysisId: string, status: string, detail: string): Promise<void> {
   const supabase = getSupabaseClient();
-  await supabase.from("analyses").update({ status, status_detail: detail }).eq("id", analysisId);
+  assertOk(
+    await supabase.from("analyses").update({ status, status_detail: detail }).eq("id", analysisId),
+    `Updating status to ${status}`,
+  );
 }
 
 export async function runAnalysis(analysis: Analysis): Promise<void> {
   const supabase = getSupabaseClient();
   try {
-    const { data: accounts } = await supabase.from("accounts").select("*").eq("analysis_id", analysis.id);
+    const { data: accounts } = assertOk(
+      await supabase.from("accounts").select("*").eq("analysis_id", analysis.id),
+      "Loading accounts",
+    );
     const accountList = (accounts ?? []) as Account[];
     const platforms = analysis.platforms as Platform[];
     const context = {
@@ -109,18 +111,22 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
     await updateStatus(analysis.id, "rendering", "Rendering reports...");
     await renderReports(analysis.id);
 
-    await supabase
-      .from("analyses")
-      .update({ status: "done", status_detail: "Complete.", completed_at: new Date().toISOString() })
-      .eq("id", analysis.id);
+    assertOk(
+      await supabase
+        .from("analyses")
+        .update({ status: "done", status_detail: "Complete.", completed_at: new Date().toISOString() })
+        .eq("id", analysis.id),
+      "Marking analysis done",
+    );
   } catch (error) {
     console.error(`Analysis ${analysis.id} failed:`, error);
-    await supabase
+    const { error: markError } = await supabase
       .from("analyses")
       .update({
         status: "failed",
         status_detail: error instanceof Error ? error.message : "Unknown error",
       })
       .eq("id", analysis.id);
+    if (markError) console.error(`Could not mark analysis ${analysis.id} failed:`, markError.message);
   }
 }

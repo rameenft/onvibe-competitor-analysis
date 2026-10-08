@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getPlatformAdapter } from "@/worker/platforms";
+import { createLimiter } from "@/lib/concurrency";
+import { cleanHandle } from "@/lib/handles";
 import type { Platform } from "@/lib/types";
+
+// Each handle is a separate Apify run of ~10-30s, so they go out in parallel
+// (capped) instead of running one after another.
+const MAX_CONCURRENT_CHECKS = 6;
+const MAX_HANDLES = 15;
 
 interface CompetitorInput {
   name: string;
@@ -21,10 +28,6 @@ interface HandleCheck {
   valid: boolean;
   followers?: number;
   error?: string;
-}
-
-function stripHandle(handle: string): string {
-  return handle.trim().replace(/^@/, "");
 }
 
 async function checkHandle(platform: Platform, handle: string): Promise<{ valid: boolean; followers?: number; error?: string }> {
@@ -52,7 +55,12 @@ async function checkHandle(platform: Platform, handle: string): Promise<{ valid:
 // a small price against wasting the expensive part of the run on a typo'd
 // or wrong handle.
 export async function POST(request: Request) {
-  const body = (await request.json()) as ValidateBody;
+  let body: ValidateBody;
+  try {
+    body = (await request.json()) as ValidateBody;
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
 
   if (!body.platforms || body.platforms.length === 0) {
     return NextResponse.json({ error: "Select at least one platform." }, { status: 400 });
@@ -62,7 +70,7 @@ export async function POST(request: Request) {
   for (const platform of body.platforms) {
     const targetHandle = body.targetHandles[platform];
     if (targetHandle?.trim()) {
-      jobs.push({ platform, role: "target", label: "Your business", handle: stripHandle(targetHandle) });
+      jobs.push({ platform, role: "target", label: "Your business", handle: targetHandle });
     }
     for (const competitor of body.competitors ?? []) {
       const handle = competitor.handles[platform];
@@ -71,20 +79,28 @@ export async function POST(request: Request) {
           platform,
           role: "competitor",
           label: competitor.name?.trim() || "Competitor",
-          handle: stripHandle(handle),
+          handle,
         });
       }
     }
   }
 
-  // Sequential, not concurrent -- same reasoning as worker/pipeline/scrape.ts:
-  // keeps Apify concurrency predictable rather than firing a dozen actor
-  // runs at once for what's meant to be a quick pre-flight check.
-  const results: HandleCheck[] = [];
-  for (const job of jobs) {
-    const result = await checkHandle(job.platform, job.handle);
-    results.push({ ...job, ...result });
+  if (jobs.length > MAX_HANDLES) {
+    return NextResponse.json({ error: `Too many handles (max ${MAX_HANDLES}).` }, { status: 400 });
   }
+
+  const limit = createLimiter(MAX_CONCURRENT_CHECKS);
+  const results: HandleCheck[] = await Promise.all(
+    jobs.map((job) =>
+      limit(async () => {
+        const handle = cleanHandle(job.handle);
+        if (!handle) {
+          return { ...job, valid: false, error: "Handles may only contain letters, numbers, dots, underscores and hyphens." };
+        }
+        return { ...job, handle, ...(await checkHandle(job.platform, handle)) };
+      }),
+    ),
+  );
 
   const allValid = results.length > 0 && results.every((r) => r.valid);
   return NextResponse.json({ allValid, results });

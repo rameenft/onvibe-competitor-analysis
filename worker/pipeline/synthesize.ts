@@ -1,5 +1,5 @@
 import { generateStructured } from "../../lib/gemini";
-import { getSupabaseClient } from "../../lib/supabase";
+import { assertOk, getSupabaseClient } from "../../lib/supabase";
 import type { AccountMetrics, CustomerReportContent, Platform } from "../../lib/types";
 
 // Replaces the Python prototype's SWOT+recommendations schema with the
@@ -92,18 +92,21 @@ export async function synthesizePlatformInsights(
   const insights = await callSynthesisTool(prompt);
 
   const supabase = getSupabaseClient();
-  await supabase.from("analysis_insights").upsert(
-    [
-      {
-        analysis_id: analysisId,
-        platform,
-        metrics,
-        data_observations: insights.data_observations,
-        explanations: insights.explanations,
-        recommendations: insights.recommendations,
-      },
-    ],
-    { onConflict: "analysis_id,platform" },
+  assertOk(
+    await supabase.from("analysis_insights").upsert(
+      [
+        {
+          analysis_id: analysisId,
+          platform,
+          metrics,
+          data_observations: insights.data_observations,
+          explanations: insights.explanations,
+          recommendations: insights.recommendations,
+        },
+      ],
+      { onConflict: "analysis_id,platform" },
+    ),
+    `Saving ${platform} insights`,
   );
 }
 
@@ -205,9 +208,12 @@ export async function synthesizeCustomerReport(
   const content = await callCustomerReportTool(prompt);
 
   const supabase = getSupabaseClient();
-  await supabase.from("analysis_reports").upsert(
-    [{ analysis_id: analysisId, report_type: "customer" as const, content }],
-    { onConflict: "analysis_id,report_type" },
+  assertOk(
+    await supabase.from("analysis_reports").upsert(
+      [{ analysis_id: analysisId, report_type: "customer" as const, content }],
+      { onConflict: "analysis_id,report_type" },
+    ),
+    "Saving customer report",
   );
 }
 
@@ -226,18 +232,21 @@ export async function synthesizeCrossPlatformInsights(
   const insights = await callSynthesisTool(prompt);
 
   const supabase = getSupabaseClient();
-  await supabase.from("analysis_insights").upsert(
-    [
-      {
-        analysis_id: analysisId,
-        platform: "all",
-        metrics: { platforms: perPlatformMetrics.map((m) => m.platform) },
-        data_observations: insights.data_observations,
-        explanations: insights.explanations,
-        recommendations: insights.recommendations,
-      },
-    ],
-    { onConflict: "analysis_id,platform" },
+  assertOk(
+    await supabase.from("analysis_insights").upsert(
+      [
+        {
+          analysis_id: analysisId,
+          platform: "all",
+          metrics: { platforms: perPlatformMetrics.map((m) => m.platform) },
+          data_observations: insights.data_observations,
+          explanations: insights.explanations,
+          recommendations: insights.recommendations,
+        },
+      ],
+      { onConflict: "analysis_id,platform" },
+    ),
+    "Saving cross-platform insights",
   );
 
   return insights;

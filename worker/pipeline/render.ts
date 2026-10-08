@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { getSupabaseClient } from "../../lib/supabase";
+import { assertOk, getSupabaseClient } from "../../lib/supabase";
 import { APP_BASE_URL } from "../../lib/config";
 import type { ReportType } from "../../lib/types";
 
@@ -62,11 +62,14 @@ export async function renderReports(analysisId: string): Promise<void> {
   // Only pdf_url is in this payload, so the upsert's ON CONFLICT UPDATE only
   // touches that column -- the customer row's `content` (already written by
   // synthesizeCustomerReport) is untouched since it isn't part of this SET.
-  await supabase.from("analysis_reports").upsert(
-    [
-      { analysis_id: analysisId, report_type: "detailed" as const, pdf_url: detailedUrl },
-      { analysis_id: analysisId, report_type: "customer" as const, pdf_url: customerUrl },
-    ],
-    { onConflict: "analysis_id,report_type" },
+  assertOk(
+    await supabase.from("analysis_reports").upsert(
+      [
+        { analysis_id: analysisId, report_type: "detailed" as const, pdf_url: detailedUrl },
+        { analysis_id: analysisId, report_type: "customer" as const, pdf_url: customerUrl },
+      ],
+      { onConflict: "analysis_id,report_type" },
+    ),
+    "Saving report PDF links",
   );
 }

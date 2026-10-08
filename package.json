@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx watch worker/index.ts",
-    "worker:once": "tsx worker/run-once.ts"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"worker/**/*.test.ts\" \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@google/genai": "^2.27.0",

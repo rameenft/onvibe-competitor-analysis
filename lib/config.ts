@@ -46,18 +46,9 @@ export function getSupabaseConfig() {
 export function getGeminiConfig() {
   return {
     apiKey: required("GEMINI_API_KEY"),
-    // `||`, not `??`: an unset GitHub Actions secret arrives as an empty string.
+    // `||`, not `??`: a blank `GEMINI_MODEL=` line in .env.local should fall back to the default.
     model: process.env.GEMINI_MODEL || "gemini-3.8-flash",
   };
-}
-
-// Optional, not required() -- if unset, the app falls back to relying
-// solely on the scheduled GitHub Actions run (see lib/github.ts).
-export function getGithubDispatchConfig(): { token: string; repo: string } | null {
-  const token = process.env.GITHUB_DISPATCH_TOKEN;
-  const repo = process.env.GITHUB_REPO;
-  if (!token || !repo) return null;
-  return { token, repo };
 }
 
 export const WORKER_POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS ?? 5000);

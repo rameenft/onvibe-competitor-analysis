@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Python side: its venv ships third-party JS that is not ours to lint.
+    "ml/**",
+    "legacy-streamlit-prototype/**",
   ]),
 ]);
 

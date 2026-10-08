@@ -1,4 +1,4 @@
-import { getSupabaseClient } from "../../lib/supabase";
+import { assertOk, getSupabaseClient } from "../../lib/supabase";
 import { weekStartISO } from "../platforms/util";
 import type { Account, AccountMetrics, Platform } from "../../lib/types";
 
@@ -8,12 +8,12 @@ import type { Account, AccountMetrics, Platform } from "../../lib/types";
 const LOW_FOLLOWER_THRESHOLD = 1000;
 const LOW_INTERACTION_THRESHOLD = 10;
 
-function round(value: number, decimals = 2): number {
+export function round(value: number, decimals = 2): number {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
 }
 
-function percentileRank(value: number, all: number[]): number {
+export function percentileRank(value: number, all: number[]): number {
   if (all.length === 0) return 0;
   const belowOrEqual = all.filter((v) => v <= value).length;
   return Math.round((100 * belowOrEqual) / all.length);
@@ -22,12 +22,15 @@ function percentileRank(value: number, all: number[]): number {
 async function computeGrowth(accountId: string, windowDays: number) {
   const supabase = getSupabaseClient();
   const sinceWeek = weekStartISO(new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000));
-  const { data: snapshots } = await supabase
-    .from("account_snapshots")
-    .select("week_start, followers")
-    .eq("account_id", accountId)
-    .gte("week_start", sinceWeek)
-    .order("week_start", { ascending: true });
+  const { data: snapshots } = assertOk(
+    await supabase
+      .from("account_snapshots")
+      .select("week_start, followers")
+      .eq("account_id", accountId)
+      .gte("week_start", sinceWeek)
+      .order("week_start", { ascending: true }),
+    "Loading follower snapshots",
+  );
 
   const rows = snapshots ?? [];
   const weeklyGrowth = rows.map((row, i) => {
@@ -53,7 +56,7 @@ async function computeGrowth(accountId: string, windowDays: number) {
   return { weeklyGrowth, cumulativeGrowthPct, growthDataGap };
 }
 
-interface PostRow {
+export interface PostRow {
   id: string;
   likes: number;
   comments: number;
@@ -65,10 +68,13 @@ interface PostRow {
 
 async function fetchPosts(accountId: string): Promise<PostRow[]> {
   const supabase = getSupabaseClient();
-  const { data } = await supabase
-    .from("posts")
-    .select("id, likes, comments, shares, views, media_type, post_categories(category)")
-    .eq("account_id", accountId);
+  const { data } = assertOk(
+    await supabase
+      .from("posts")
+      .select("id, likes, comments, shares, views, media_type, post_categories(category)")
+      .eq("account_id", accountId),
+    "Loading posts",
+  );
   return (data ?? []) as unknown as PostRow[];
 }
 
@@ -78,7 +84,7 @@ function categoryOf(row: PostRow): string | null {
   return Array.isArray(cat) ? (cat[0]?.category ?? null) : cat.category;
 }
 
-function computeMediaTypeBreakdown(posts: PostRow[]): Record<string, { postCount: number; avgEngagement: number }> {
+export function computeMediaTypeBreakdown(posts: PostRow[]): Record<string, { postCount: number; avgEngagement: number }> {
   const byType = new Map<string, number[]>();
   for (const post of posts) {
     const type = post.media_type ?? "unknown";
@@ -92,11 +98,11 @@ function computeMediaTypeBreakdown(posts: PostRow[]): Record<string, { postCount
   return result;
 }
 
-function average(values: number[]): number {
+export function average(values: number[]): number {
   return values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
 }
 
-function computeCollaborationCadence(posts: PostRow[]) {
+export function computeCollaborationCadence(posts: PostRow[]) {
   const baseline = average(posts.map((p) => p.likes + p.comments));
   const collabPosts = posts.filter((p) => {
     const cat = categoryOf(p);
@@ -114,7 +120,7 @@ function computeCollaborationCadence(posts: PostRow[]) {
 // All content categories vs the account's overall baseline — the full
 // picture (collaborationCadence above is just the collaboration/
 // paid_promotion slice called out on its own).
-function computeCategoryBreakdown(posts: PostRow[], baseline: number) {
+export function computeCategoryBreakdown(posts: PostRow[], baseline: number) {
   const byCategory = new Map<string, number[]>();
   for (const post of posts) {
     const category = categoryOf(post);
@@ -189,7 +195,7 @@ export async function computeAccountMetrics(account: Account, windowDays: number
 // Percentiles are computed within one platform's target+competitor set —
 // the same relative-context approach as the Python prototype's
 // attach_percentiles, just applied per platform now instead of globally.
-function attachPercentiles(accounts: AccountMetrics[]): AccountMetrics[] {
+export function attachPercentiles(accounts: AccountMetrics[]): AccountMetrics[] {
   const engagementRates = accounts.map((a) => a.engagementRate);
   const followerCounts = accounts.map((a) => a.followers);
   const avgLikesValues = accounts.map((a) => a.avgLikes);

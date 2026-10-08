@@ -18,3 +18,11 @@ export function getSupabaseClient(): SupabaseClient {
   }
   return client;
 }
+
+// supabase-js reports failures as a returned `error`, never a throw, so a bare
+// `await supabase.from(...).upsert(...)` silently swallows them. Wrap every
+// write/read whose failure should stop the pipeline.
+export function assertOk<T extends { error: { message: string } | null }>(result: T, what: string): T {
+  if (result.error) throw new Error(`${what}: ${result.error.message}`);
+  return result;
+}

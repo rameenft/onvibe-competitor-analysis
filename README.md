@@ -9,7 +9,7 @@ three competitors, and produces two reports:
    findings, split into three explicit sections: **what the data show**, **what we
    believe may explain it**, and **what we recommend testing**.
    [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
-3. **A customer-facing report** (OnVibe-branded) — condensed to what a client actually
+2. **A customer-facing report** (OnVibe-branded) — condensed to what a client actually
    needs: the 3 most important findings, content patterns that are working, competitive
    gaps, 3-5 experiments to run next, and a 30/60/90-day plan with success metrics.
    [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
@@ -17,8 +17,7 @@ three competitors, and produces two reports:
 Both are viewable in-browser and downloadable as PDFs.
 
 
-   **Live app**: [onvibe-competitor-analysis.vercel.app](https://onvibe-competitor-analysis.vercel.app/)
-
+Runs locally (see [Running it](#running-it)).
 
 ## The workflow, end to end
 
@@ -48,9 +47,21 @@ Everything runs as a background worker process, not inside the web request — s
 multi-minute pipeline run doesn't time out or block the app.
 
 
-**Setup note**: this added a `views` column to the `posts` table — run
-`alter table posts add column if not exists views integer;` in the Supabase SQL editor
-before the next real analysis (scraping will fail without it).
+## Running it
+
+Copy `.env.example` to `.env.local` and fill in the Supabase, Apify and Gemini keys, then run the
+SQL in `supabase/schema.sql` (and `supabase/kg_schema.sql` for the graph) in the Supabase SQL editor.
+Three terminals, from the repo root:
+
+```bash
+npm install && npx playwright install chromium
+npm run dev       # the web app on http://localhost:3000
+npm run worker    # the pipeline; picks up analyses submitted in the app
+```
+
+The worker renders the PDFs by opening the report pages, so `npm run dev` has to be running while an
+analysis finishes. Checks: `npm run typecheck`, `npm run lint`, `npm test` (TypeScript) and
+`python -m pytest` in `ml/` (Python).
 
 ## Evals and knowledge graph (`ml/`, Python, runs on Gemini)
 
