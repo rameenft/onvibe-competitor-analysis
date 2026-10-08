@@ -18,8 +18,8 @@ export type PostCategory =
   | "educational"
   | "other";
 export type MediaType = "image" | "video" | "reel" | "carousel" | "article" | "document" | "text";
-export type ReportType = "detailed" | "customer";
-export type SnapshotSource = "socialblade" | "apify_profile";
+// The one report is stored under "customer" (the DB check constraint also allows the retired "detailed").
+export type ReportType = "customer";
 
 export interface Analysis {
   id: string;
@@ -46,14 +46,6 @@ export interface Account {
   following: number | null;
   bio: string | null;
   scraped_at: string | null;
-}
-
-export interface AccountSnapshot {
-  id: string;
-  account_id: string;
-  week_start: string;
-  followers: number;
-  source: SnapshotSource;
 }
 
 export interface Post {
@@ -83,8 +75,8 @@ export interface PostCategoryRow {
 export interface AnalysisInsights {
   id: string;
   analysis_id: string;
-  platform: Platform | "all";
-  metrics: PlatformMetrics | CrossPlatformMetrics;
+  platform: Platform;
+  metrics: PlatformMetrics;
   data_observations: string[];
   explanations: string[];
   recommendations: string[];
@@ -96,10 +88,9 @@ export interface PlanPhase {
   successMetrics: string[];
 }
 
-// Shape of analysis_reports.content for report_type='customer' — produced
-// by worker/pipeline/synthesize.ts's dedicated customer-report synthesis
-// pass, which doesn't map 1:1 from AnalysisInsights' three-bucket framework.
-export interface CustomerReportContent {
+// Shape of analysis_reports.content -- the summary half of the report, written by
+// worker/pipeline/synthesize.ts. The per-platform observations live in analysis_insights.
+export interface ReportContent {
   key_findings: string[];
   working_content_patterns: string[];
   competitive_gaps: string[];
@@ -123,9 +114,6 @@ export interface AccountMetrics {
   role: AccountRole;
   platform: Platform;
   followers: number;
-  weeklyGrowth: { weekStart: string; followers: number; growthPct: number | null }[];
-  cumulativeGrowthPct: number | null;
-  growthDataGap: string | null; // set when snapshot history is missing/insufficient
   postCount: number;
   avgLikes: number;
   avgComments: number;
@@ -149,9 +137,4 @@ export interface AccountMetrics {
 export interface PlatformMetrics {
   platform: Platform;
   accounts: AccountMetrics[];
-}
-
-export interface CrossPlatformMetrics {
-  platforms: Platform[];
-  perPlatform: Record<Platform, AccountMetrics[]>;
 }

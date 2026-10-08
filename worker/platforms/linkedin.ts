@@ -1,7 +1,6 @@
 import { getApifyClient, getApifyConfig } from "../../lib/apify";
 import type { MediaType } from "../../lib/types";
-import type { PlatformAdapter, PostData, ProfileData, SnapshotData } from "./types";
-import { fetchHistoricalSnapshots } from "./socialblade";
+import type { PlatformAdapter, PostData, ProfileData } from "./types";
 
 /**
  * VERIFY BEFORE FIRST REAL RUN: scrapier/linkedin-company-scraper-actor
@@ -12,12 +11,6 @@ import { fetchHistoricalSnapshots } from "./socialblade";
  * LinkedIn ToS risk: LinkedIn's terms explicitly prohibit scraping. These
  * are no-login/public-page actors, which reduces but does not eliminate
  * that risk. Proceeding at the user's explicit, informed request.
- *
- * Historical growth: Social Blade's publicly documented coverage does not
- * clearly include LinkedIn, so `fetchHistoricalSnapshots` returning null
- * (a data gap, surfaced explicitly in the report) is the expected outcome
- * here, not necessarily a bug — there may simply be no historical source
- * for LinkedIn follower counts yet.
  *
  * No impressions: LinkedIn impressions are a private, admin-only metric --
  * not obtainable for a competitor's page via public scraping, and
@@ -84,7 +77,4 @@ export const linkedinAdapter: PlatformAdapter = {
     return posts;
   },
 
-  fetchHistoricalSnapshots(handle: string, sinceDate: Date): Promise<SnapshotData[] | null> {
-    return fetchHistoricalSnapshots("linkedin", handle, sinceDate);
-  },
 };

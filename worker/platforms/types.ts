@@ -27,16 +27,7 @@ export interface PostData {
   coauthorHandle: string | null;
 }
 
-export interface SnapshotData {
-  weekStart: string; // YYYY-MM-DD, Monday of the week
-  followers: number;
-}
-
 export interface PlatformAdapter {
   fetchProfile(handle: string): Promise<ProfileData>;
   fetchPosts(handle: string, sinceDate: Date): Promise<PostData[]>;
-  // Returns null (not an empty array) when no historical data exists at all
-  // for this account — a real data gap to surface explicitly, not a silent
-  // zero-growth result.
-  fetchHistoricalSnapshots(handle: string, sinceDate: Date): Promise<SnapshotData[] | null>;
 }

@@ -4,6 +4,7 @@ import { APP_BASE_URL } from "../../lib/config";
 import type { ReportType } from "../../lib/types";
 
 const REPORT_READY_TIMEOUT_MS = 20000;
+const REPORT_TYPE: ReportType = "customer";
 
 async function capturePdf(url: string): Promise<Buffer> {
   const browser = await chromium.launch();
@@ -45,31 +46,24 @@ async function uploadReport(analysisId: string, reportType: ReportType, pdf: Buf
   return data.publicUrl;
 }
 
-// Captures both report pages via the app's own print-mode routes
-// (?print=1 hides in-app navigation chrome) and uploads the resulting PDFs
-// to Supabase Storage. Reuses the exact same React components/CSS/charts as
-// the live in-browser view — there is no separate PDF-specific
-// implementation to keep in sync.
-export async function renderReports(analysisId: string): Promise<void> {
+// Captures the report page via the app's own print-mode route (?print=1 hides
+// in-app navigation chrome) and uploads the PDF to Supabase Storage. Reuses the
+// exact same React components/CSS/charts as the live in-browser view -- there is
+// no separate PDF-specific implementation to keep in sync.
+export async function renderReport(analysisId: string): Promise<void> {
   const supabase = getSupabaseClient();
 
-  const detailedPdf = await capturePdf(`${APP_BASE_URL}/analyses/${analysisId}/report/detailed?print=1`);
-  const detailedUrl = await uploadReport(analysisId, "detailed", detailedPdf);
-
-  const customerPdf = await capturePdf(`${APP_BASE_URL}/analyses/${analysisId}/report/customer?print=1`);
-  const customerUrl = await uploadReport(analysisId, "customer", customerPdf);
+  const pdf = await capturePdf(`${APP_BASE_URL}/analyses/${analysisId}/report?print=1`);
+  const pdfUrl = await uploadReport(analysisId, REPORT_TYPE, pdf);
 
   // Only pdf_url is in this payload, so the upsert's ON CONFLICT UPDATE only
-  // touches that column -- the customer row's `content` (already written by
-  // synthesizeCustomerReport) is untouched since it isn't part of this SET.
+  // touches that column -- the row's `content` (already written by
+  // synthesizeReport) is untouched since it isn't part of this SET.
   assertOk(
     await supabase.from("analysis_reports").upsert(
-      [
-        { analysis_id: analysisId, report_type: "detailed" as const, pdf_url: detailedUrl },
-        { analysis_id: analysisId, report_type: "customer" as const, pdf_url: customerUrl },
-      ],
+      [{ analysis_id: analysisId, report_type: REPORT_TYPE, pdf_url: pdfUrl }],
       { onConflict: "analysis_id,report_type" },
     ),
-    "Saving report PDF links",
+    "Saving report PDF link",
   );
 }

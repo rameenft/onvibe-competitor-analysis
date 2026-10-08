@@ -1,5 +1,4 @@
 import { assertOk, getSupabaseClient } from "../../lib/supabase";
-import { weekStartISO } from "../platforms/util";
 import type { Account, AccountMetrics, Platform } from "../../lib/types";
 
 // Sense-making guard: an account can post a high engagement *rate* on a
@@ -17,43 +16,6 @@ export function percentileRank(value: number, all: number[]): number {
   if (all.length === 0) return 0;
   const belowOrEqual = all.filter((v) => v <= value).length;
   return Math.round((100 * belowOrEqual) / all.length);
-}
-
-async function computeGrowth(accountId: string, windowDays: number) {
-  const supabase = getSupabaseClient();
-  const sinceWeek = weekStartISO(new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000));
-  const { data: snapshots } = assertOk(
-    await supabase
-      .from("account_snapshots")
-      .select("week_start, followers")
-      .eq("account_id", accountId)
-      .gte("week_start", sinceWeek)
-      .order("week_start", { ascending: true }),
-    "Loading follower snapshots",
-  );
-
-  const rows = snapshots ?? [];
-  const weeklyGrowth = rows.map((row, i) => {
-    const prev = rows[i - 1];
-    const growthPct =
-      prev && prev.followers > 0 ? round(((row.followers - prev.followers) / prev.followers) * 100) : null;
-    return { weekStart: row.week_start, followers: row.followers, growthPct };
-  });
-
-  let cumulativeGrowthPct: number | null = null;
-  let growthDataGap: string | null = null;
-  if (rows.length >= 2) {
-    const first = rows[0];
-    const last = rows[rows.length - 1];
-    cumulativeGrowthPct =
-      first.followers > 0 ? round(((last.followers - first.followers) / first.followers) * 100) : null;
-  } else {
-    growthDataGap =
-      "Fewer than two weekly snapshots are available for this account in the window — growth requires at least " +
-      "two data points and is a data gap here, not a zero.";
-  }
-
-  return { weeklyGrowth, cumulativeGrowthPct, growthDataGap };
 }
 
 export interface PostRow {
@@ -142,7 +104,6 @@ export function computeCategoryBreakdown(posts: PostRow[], baseline: number) {
 
 export async function computeAccountMetrics(account: Account, windowDays: number): Promise<AccountMetrics> {
   const posts = await fetchPosts(account.id);
-  const { weeklyGrowth, cumulativeGrowthPct, growthDataGap } = await computeGrowth(account.id, windowDays);
 
   const followers = account.followers ?? 0;
   const postCount = posts.length;
@@ -170,9 +131,6 @@ export async function computeAccountMetrics(account: Account, windowDays: number
     role: account.role,
     platform: account.platform,
     followers,
-    weeklyGrowth,
-    cumulativeGrowthPct,
-    growthDataGap,
     postCount,
     avgLikes: round(avgLikes),
     avgComments: round(avgComments),

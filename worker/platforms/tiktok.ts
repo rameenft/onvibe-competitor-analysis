@@ -1,7 +1,6 @@
 import { getApifyClient, getApifyConfig } from "../../lib/apify";
 import type { MediaType } from "../../lib/types";
-import type { PlatformAdapter, PostData, ProfileData, SnapshotData } from "./types";
-import { fetchHistoricalSnapshots } from "./socialblade";
+import type { PlatformAdapter, PostData, ProfileData } from "./types";
 
 /**
  * VERIFY BEFORE FIRST REAL RUN: clockworks/tiktok-profile-scraper and
@@ -72,7 +71,4 @@ export const tiktokAdapter: PlatformAdapter = {
     return posts;
   },
 
-  fetchHistoricalSnapshots(handle: string, sinceDate: Date): Promise<SnapshotData[] | null> {
-    return fetchHistoricalSnapshots("tiktok", handle, sinceDate);
-  },
 };

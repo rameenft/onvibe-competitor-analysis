@@ -120,7 +120,7 @@ export default function HomePage() {
       <div className="px-6 py-12">
         <h1 className="text-2xl font-semibold">Competitive Analysis</h1>
         <p className="mt-2 text-sm text-neutral-500">
-          Enter your business and up to three competitors. We&apos;ll analyze weekly growth, engagement, content
+          Enter your business and up to three competitors. We&apos;ll analyze engagement, content
           patterns, and collaborations over the last 90 days.
         </p>
 

@@ -31,7 +31,6 @@ export function getApifyConfig() {
         profile: required("APIFY_LINKEDIN_PROFILE_ACTOR_ID"),
         posts: required("APIFY_LINKEDIN_POST_ACTOR_ID"),
       },
-      socialblade: required("APIFY_SOCIALBLADE_ACTOR_ID"),
     },
   };
 }
@@ -56,7 +55,6 @@ export const APP_BASE_URL = process.env.APP_BASE_URL ?? "http://localhost:3000";
 
 export const MAX_COMPETITORS = 3;
 export const WINDOW_DAYS = 90;
-export const SNAPSHOT_WEEKS = 13;
 
 export const PLATFORMS = ["instagram", "tiktok", "linkedin"] as const;
 export type Platform = (typeof PLATFORMS)[number];

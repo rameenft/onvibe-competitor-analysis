@@ -4,8 +4,12 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { ReportReadyMarker } from "@/components/reports/ReportReadyMarker";
 import { OnVibeLetterhead } from "@/components/reports/OnVibeLetterhead";
 import { ONVIBE_BRAND } from "@/components/reports/brand";
+import { CompetitiveLandscapeChart } from "@/components/charts/CompetitiveLandscapeChart";
+import { MediaTypeChart } from "@/components/charts/MediaTypeChart";
+import { CategoryPerformanceChart } from "@/components/charts/CategoryPerformanceChart";
+import { ViewsPerformanceChart } from "@/components/charts/ViewsPerformanceChart";
 import { getTopicGaps, type TopicGapsResult } from "@/lib/kg";
-import type { CustomerReportContent } from "@/lib/types";
+import type { AccountMetrics, AnalysisInsights, Platform, ReportContent } from "@/lib/types";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -24,6 +28,110 @@ function Section({ title, items }: { title: string; items: string[] }) {
           <li key={i}>{item}</li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+const PLATFORM_ORDER: Platform[] = ["instagram", "tiktok", "linkedin"];
+
+function ChartHeading({ children }: { children: React.ReactNode }) {
+  return <h4 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">{children}</h4>;
+}
+
+function PlatformSection({ row }: { row: AnalysisInsights }) {
+  const accounts: AccountMetrics[] = row.metrics.accounts;
+  const lowSampleAccounts = accounts.filter((a) => a.lowSampleWarning);
+  const hasViews = accounts.some((a) => a.avgViews != null);
+
+  return (
+    <section className="mt-10">
+      <h2 className="border-b border-neutral-200 pb-2 text-lg font-bold capitalize dark:border-neutral-800" style={{ color: ONVIBE_BRAND.teal }}>
+        {row.platform}
+      </h2>
+
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-neutral-200 text-left text-neutral-500 dark:border-neutral-800">
+              <th className="py-2 pr-4">Account</th>
+              <th className="py-2 pr-4">Followers</th>
+              <th className="py-2 pr-4">Engagement rate</th>
+              <th className="py-2 pr-4">Avg likes</th>
+              <th className="py-2 pr-4">Avg comments</th>
+              {hasViews && <th className="py-2 pr-4">Avg views</th>}
+              <th className="py-2 pr-4">Posts/wk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {accounts.map((a) => (
+              <tr
+                key={a.accountId}
+                className={`border-b border-neutral-100 dark:border-neutral-900 ${a.role === "target" ? "font-semibold" : ""}`}
+              >
+                <td className="py-2 pr-4">
+                  {a.role === "target" ? "★ " : ""}
+                  {a.handle}
+                </td>
+                <td className="py-2 pr-4">
+                  {a.followers.toLocaleString()} <span className="text-neutral-400">(p{a.followersPercentile})</span>
+                </td>
+                <td className="py-2 pr-4">
+                  {(a.engagementRate * 100).toFixed(2)}%{" "}
+                  <span className="text-neutral-400">(p{a.engagementRatePercentile})</span>
+                  {a.lowSampleWarning && <div className="text-xs text-amber-600">low-sample</div>}
+                </td>
+                <td className="py-2 pr-4">{a.avgLikes}</td>
+                <td className="py-2 pr-4">{a.avgComments}</td>
+                {hasViews && (
+                  <td className="py-2 pr-4">
+                    {a.avgViews != null ? (
+                      <>
+                        {a.avgViews.toLocaleString()}{" "}
+                        {a.avgViewsPercentile != null && (
+                          <span className="text-neutral-400">(p{a.avgViewsPercentile})</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-neutral-400">—</span>
+                    )}
+                  </td>
+                )}
+                <td className="py-2 pr-4">{a.postsPerWeek}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {lowSampleAccounts.length > 0 && (
+        <p className="mt-2 text-xs italic text-amber-600">
+          Low-sample: {lowSampleAccounts.map((a) => a.handle).join(", ")} — reach is small enough that the
+          engagement rate should be read directionally, not as a sign of outsized performance.
+        </p>
+      )}
+
+      {row.data_observations.length > 0 && (
+        <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-relaxed">
+          {row.data_observations.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      )}
+
+      <ChartHeading>Competitive landscape</ChartHeading>
+      <CompetitiveLandscapeChart accounts={accounts} />
+
+      <ChartHeading>Content type performance</ChartHeading>
+      <MediaTypeChart accounts={accounts} />
+
+      {hasViews && (
+        <>
+          <ChartHeading>Views per post</ChartHeading>
+          <ViewsPerformanceChart accounts={accounts} />
+        </>
+      )}
+
+      <ChartHeading>Category performance vs organic baseline</ChartHeading>
+      <CategoryPerformanceChart accounts={accounts} />
     </section>
   );
 }
@@ -111,6 +219,11 @@ export default async function CustomerReportPage({ params, searchParams }: Props
   const { data: analysis } = await supabase.from("analyses").select("*").eq("id", id).maybeSingle();
   if (!analysis) notFound();
 
+  const { data: insightRows } = await supabase.from("analysis_insights").select("*").eq("analysis_id", id);
+  const platformRows = ((insightRows ?? []) as unknown as AnalysisInsights[])
+    .filter((r) => PLATFORM_ORDER.includes(r.platform))
+    .sort((a, b) => PLATFORM_ORDER.indexOf(a.platform) - PLATFORM_ORDER.indexOf(b.platform));
+
   const { data: report } = await supabase
     .from("analysis_reports")
     .select("content")
@@ -118,7 +231,7 @@ export default async function CustomerReportPage({ params, searchParams }: Props
     .eq("report_type", "customer")
     .maybeSingle();
 
-  const content = report?.content as CustomerReportContent | undefined;
+  const content = report?.content as ReportContent | undefined;
   if (!content) {
     return (
       <main className="mx-auto max-w-2xl px-6 py-12">
@@ -137,7 +250,7 @@ export default async function CustomerReportPage({ params, searchParams }: Props
   }
 
   return (
-    <main className={`mx-auto max-w-2xl ${isPrint ? "pb-10" : "pb-12"}`}>
+    <main className={`mx-auto max-w-3xl ${isPrint ? "pb-10" : "pb-12"}`}>
       <ReportReadyMarker />
 
       <OnVibeLetterhead label="Competitive Analysis Report" />
@@ -150,10 +263,14 @@ export default async function CustomerReportPage({ params, searchParams }: Props
         )}
         <h1 className="mt-4 text-3xl font-semibold">{analysis.company_name}</h1>
         <p className="mt-2 text-sm text-neutral-500">
-          {analysis.industry} · {analysis.region} · Competitive analysis summary
+          {analysis.industry} · {analysis.region} · Last {analysis.window_days} days
         </p>
 
         <Section title="The three most important things we learned" items={content.key_findings} />
+        {platformRows.map((row) => (
+          <PlatformSection key={row.platform} row={row} />
+        ))}
+
         <Section title="Content patterns that appear to be working" items={content.working_content_patterns} />
         <Section title="Your most important competitive gaps" items={content.competitive_gaps} />
         {topicGaps && <TopicGaps result={topicGaps} />}
@@ -190,7 +307,7 @@ export default async function CustomerReportPage({ params, searchParams }: Props
           <span className="font-semibold" style={{ color: ONVIBE_BRAND.coral }}>
             OnVibe
           </span>{" "}
-          · A full methodology writeup is available in the detailed report.
+          · Data: Apify scrapers (profile and posts) · Content classification and writing: Gemini.
         </footer>
       </div>
     </main>

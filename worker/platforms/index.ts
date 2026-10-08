@@ -14,4 +14,4 @@ export function getPlatformAdapter(platform: Platform): PlatformAdapter {
   return adapters[platform];
 }
 
-export type { PlatformAdapter, ProfileData, PostData, SnapshotData } from "./types";
+export type { PlatformAdapter, ProfileData, PostData } from "./types";

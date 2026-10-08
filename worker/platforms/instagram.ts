@@ -1,7 +1,6 @@
 import { getApifyClient, getApifyConfig } from "../../lib/apify";
 import type { MediaType } from "../../lib/types";
-import type { PlatformAdapter, PostData, ProfileData, SnapshotData } from "./types";
-import { fetchHistoricalSnapshots } from "./socialblade";
+import type { PlatformAdapter, PostData, ProfileData } from "./types";
 
 // Field names below are ported directly from the working Python prototype
 // (pipeline/scrape.py against apify/instagram-profile-scraper and
@@ -73,7 +72,4 @@ export const instagramAdapter: PlatformAdapter = {
       .filter((post) => post.postUrl);
   },
 
-  fetchHistoricalSnapshots(handle: string, sinceDate: Date): Promise<SnapshotData[] | null> {
-    return fetchHistoricalSnapshots("instagram", handle, sinceDate);
-  },
 };

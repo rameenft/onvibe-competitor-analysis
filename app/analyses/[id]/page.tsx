@@ -10,7 +10,7 @@ interface AnalysisStatusResponse {
     status: string;
     status_detail: string | null;
   };
-  reports: { report_type: "detailed" | "customer"; pdf_url: string | null }[];
+  reports: { report_type: string; pdf_url: string | null }[];
   error?: string;
 }
 
@@ -66,8 +66,7 @@ export default function AnalysisStatusPage({ params }: { params: Promise<{ id: s
 
   const { analysis, reports } = data;
   const stepIndex = STEPS.indexOf(analysis.status);
-  const detailedReport = reports.find((r) => r.report_type === "detailed");
-  const customerReport = reports.find((r) => r.report_type === "customer");
+  const report = reports.find((r) => r.report_type === "customer");
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -103,29 +102,16 @@ export default function AnalysisStatusPage({ params }: { params: Promise<{ id: s
       {analysis.status === "done" && (
         <div className="mt-8 flex flex-col gap-3">
           <Link
-            href={`/analyses/${id}/report/customer`}
+            href={`/analyses/${id}/report`}
             className="rounded bg-neutral-900 px-4 py-2 text-center text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
           >
-            View customer-facing report
+            View report
           </Link>
-          <Link
-            href={`/analyses/${id}/report/detailed`}
-            className="rounded border border-neutral-300 px-4 py-2 text-center text-sm font-medium dark:border-neutral-700"
-          >
-            View detailed report
-          </Link>
-          <div className="mt-2 flex gap-3 text-sm">
-            {customerReport?.pdf_url && (
-              <a href={customerReport.pdf_url} className="underline" target="_blank" rel="noreferrer">
-                Download customer PDF
-              </a>
-            )}
-            {detailedReport?.pdf_url && (
-              <a href={detailedReport.pdf_url} className="underline" target="_blank" rel="noreferrer">
-                Download detailed PDF
-              </a>
-            )}
-          </div>
+          {report?.pdf_url && (
+            <a href={report.pdf_url} className="text-center text-sm underline" target="_blank" rel="noreferrer">
+              Download PDF
+            </a>
+          )}
         </div>
       )}
     </main>

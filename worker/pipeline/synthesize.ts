@@ -1,114 +1,6 @@
 import { generateStructured } from "../../lib/gemini";
 import { assertOk, getSupabaseClient } from "../../lib/supabase";
-import type { AccountMetrics, CustomerReportContent, Platform } from "../../lib/types";
-
-// Replaces the Python prototype's SWOT+recommendations schema with the
-// three explicit buckets the user's report structure is built around.
-const INSIGHTS_TOOL = {
-  name: "produce_insights",
-  description:
-    "Produce data-grounded observations, candidate explanations, and testable recommendations for a competitive analysis.",
-  input_schema: {
-    type: "object" as const,
-    properties: {
-      data_observations: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 3,
-        maxItems: 6,
-        description: "Objective, metric-cited statements — what the data literally shows. No interpretation here.",
-      },
-      explanations: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 2,
-        maxItems: 5,
-        description:
-          "Interpretive hypotheses that might explain the observations. Must read as inference, not fact " +
-          "(e.g. 'this may be because...', 'a plausible driver is...').",
-      },
-      recommendations: {
-        type: "array",
-        items: { type: "string" },
-        minItems: 3,
-        maxItems: 6,
-        description:
-          "Framed as experiments to test, not directives — each names the metric it targets and what success " +
-          "would look like.",
-      },
-    },
-    required: ["data_observations", "explanations", "recommendations"],
-  },
-};
-
-const SYSTEM_PROMPT = `You are producing the insights section of a social media competitive analysis. Structure your \
-output into exactly three buckets, and do not blend them:
-
-1. data_observations: what the data literally shows. Every point must cite a specific metric, percentile, or \
-named competitor comparison from the data provided — never generic commentary. If a metric is unavailable (e.g. \
-a growth data gap), say so explicitly rather than guessing or omitting the topic. Never state a raw engagement \
-rate as a sign of strong performance if the data includes a low-sample warning for that account — cite the \
-warning instead. Where avgViews is present (TikTok, and Instagram video/Reel content), treat it as a reach signal \
-distinct from engagement rate — a post can be widely viewed without proportional likes/comments, and that gap is \
-itself worth calling out. For LinkedIn, do not reference "impressions" — that metric is private to each page's own \
-admin and isn't in this data at all; the closest available signal is shares (LinkedIn's own "reposts").
-
-2. explanations: your best-guess reasoning for WHY the observations might be true. These are hypotheses, not \
-facts — phrase them accordingly ("this may be because...", "a plausible driver is..."). Ground each in the \
-observations above; do not introduce new unsupported claims.
-
-3. recommendations: concrete experiments to run, each naming the metric it targets and what a successful \
-outcome would look like. Frame as tests, not commands.
-
-Keep each bullet to one or two sentences.`;
-
-interface AnalysisContext {
-  companyName: string;
-  industry: string;
-  region: string;
-}
-
-interface Insights {
-  data_observations: string[];
-  explanations: string[];
-  recommendations: string[];
-}
-
-async function callSynthesisTool(prompt: string): Promise<Insights> {
-  return generateStructured<Insights>(SYSTEM_PROMPT, INSIGHTS_TOOL.input_schema, prompt, INSIGHTS_TOOL.name);
-}
-
-export async function synthesizePlatformInsights(
-  analysisId: string,
-  platform: Platform,
-  context: AnalysisContext,
-  metrics: { platform: Platform; accounts: AccountMetrics[] },
-): Promise<void> {
-  const prompt =
-    `Company: ${context.companyName}\nIndustry: ${context.industry}\nRegion: ${context.region}\n` +
-    `Platform: ${platform}\n\nMetrics (target + up to 3 competitors, current window):\n` +
-    JSON.stringify(metrics, null, 2);
-
-  const insights = await callSynthesisTool(prompt);
-
-  const supabase = getSupabaseClient();
-  assertOk(
-    await supabase.from("analysis_insights").upsert(
-      [
-        {
-          analysis_id: analysisId,
-          platform,
-          metrics,
-          data_observations: insights.data_observations,
-          explanations: insights.explanations,
-          recommendations: insights.recommendations,
-        },
-      ],
-      { onConflict: "analysis_id,platform" },
-    ),
-    `Saving ${platform} insights`,
-  );
-}
+import type { AccountMetrics, Platform, ReportContent } from "../../lib/types";
 
 const PLAN_PHASE_SCHEMA = {
   type: "object" as const,
@@ -119,13 +11,12 @@ const PLAN_PHASE_SCHEMA = {
   required: ["actions", "successMetrics"],
 };
 
-// A distinct synthesis pass for the customer-facing report's specific
-// structure — this doesn't map 1:1 from the detailed report's three-bucket
-// data_observations/explanations/recommendations framework, so it gets its
-// own tool schema rather than being sliced out of that one.
-const CUSTOMER_REPORT_TOOL = {
-  name: "produce_customer_report",
-  description: "Produce the condensed customer-facing summary of a competitive analysis.",
+// The single synthesis pass behind the report. platform_observations is the
+// metric-cited detail for each platform's section; the rest is the summary,
+// patterns, gaps, experiments and plan.
+const REPORT_TOOL = {
+  name: "produce_report",
+  description: "Produce the written content of a social media competitive analysis report.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -135,6 +26,24 @@ const CUSTOMER_REPORT_TOOL = {
         minItems: 3,
         maxItems: 3,
         description: "The three most important things learned from this analysis.",
+      },
+      platform_observations: {
+        type: "array",
+        description: "One entry per analyzed platform, each with the metric-cited observations for that platform.",
+        items: {
+          type: "object",
+          properties: {
+            platform: { type: "string", enum: ["instagram", "tiktok", "linkedin"] },
+            observations: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 3,
+              maxItems: 5,
+              description: "What the data literally shows for this platform. Each cites a specific metric, percentile, or named competitor comparison.",
+            },
+          },
+          required: ["platform", "observations"],
+        },
       },
       working_content_patterns: {
         type: "array",
@@ -163,91 +72,89 @@ const CUSTOMER_REPORT_TOOL = {
         required: ["day30", "day60", "day90"],
       },
     },
-    required: ["key_findings", "working_content_patterns", "competitive_gaps", "experiments", "plan"],
+    required: [
+      "key_findings",
+      "platform_observations",
+      "working_content_patterns",
+      "competitive_gaps",
+      "experiments",
+      "plan",
+    ],
   },
 };
 
-const CUSTOMER_SYSTEM_PROMPT = `You are writing the customer-facing summary of a social media competitive \
-analysis. The reader is a business owner, not an analyst — simplify the structure considerably and drop \
-methodology, percentiles, and raw metric tables entirely. Still ground every point in the underlying data you're \
-given (don't invent findings), but state it in plain business language.
+const SYSTEM_PROMPT = `You are writing a social media competitive analysis for a business owner. Be specific and \
+plain-spoken: ground every point in the data you're given (never invent findings), and keep every bullet to one or \
+two sentences.
 
-Produce exactly five things:
+Produce exactly these parts:
 1. key_findings: the three most important things learned — the headline takeaways, not a full list.
-2. working_content_patterns: content patterns that appear to work in this category, based on what the top \
+2. platform_observations: for each analyzed platform, what the data literally shows. Every point must cite a \
+specific metric, percentile, or named competitor comparison — never generic commentary. Never present a raw \
+engagement rate as a sign of strong performance if the data includes a low-sample warning for that account — cite \
+the warning instead. Where avgViews is present (TikTok, and Instagram video/Reel content), treat it as a reach \
+signal distinct from engagement rate — a post can be widely viewed without proportional likes/comments, and that \
+gap is worth calling out. For LinkedIn, do not reference "impressions" — that metric is private to each page's own \
+admin and isn't in this data; the closest available signal is shares (LinkedIn's own "reposts"). Do not discuss \
+follower growth: only current follower counts are available.
+3. working_content_patterns: content patterns that appear to work in this category, based on what the top \
 performers in the data are doing.
-3. competitive_gaps: the target's most important competitive gaps versus the competitor set.
-4. experiments: 3-5 concrete experiments to run next, each specific enough to act on immediately.
-5. plan: a 30/60/90-day plan. Each phase needs concrete actions AND measurable success metrics (a specific \
-number or rate to hit, not "improve engagement"). Day 30 should be quick, low-risk tests; day 60 should build on \
-what worked; day 90 should be a clear checkpoint on whether the strategy is working.
+4. competitive_gaps: the target's most important competitive gaps versus the competitor set.
+5. experiments: 3-5 concrete experiments to run next, each specific enough to act on immediately.
+6. plan: a 30/60/90-day plan. Each phase needs concrete actions AND measurable success metrics (a specific number \
+or rate to hit, not "improve engagement"). Day 30 should be quick, low-risk tests; day 60 should build on what \
+worked; day 90 should be a clear checkpoint on whether the strategy is working.`;
 
-Keep every bullet short — one sentence each.`;
-
-async function callCustomerReportTool(prompt: string): Promise<CustomerReportContent> {
-  return generateStructured<CustomerReportContent>(
-    CUSTOMER_SYSTEM_PROMPT,
-    CUSTOMER_REPORT_TOOL.input_schema,
-    prompt,
-    CUSTOMER_REPORT_TOOL.name,
-  );
+interface AnalysisContext {
+  companyName: string;
+  industry: string;
+  region: string;
 }
 
-export async function synthesizeCustomerReport(
+type SynthesisOutput = ReportContent & {
+  platform_observations: { platform: Platform; observations: string[] }[];
+};
+
+// One Gemini call for the whole report. Per-platform metrics go into
+// analysis_insights (the evals read them from there) with that platform's
+// observations; everything else is saved as the report content.
+export async function synthesizeReport(
   analysisId: string,
   context: AnalysisContext,
   perPlatformMetrics: { platform: Platform; accounts: AccountMetrics[] }[],
-  crossPlatformInsights: Insights,
 ): Promise<void> {
   const prompt =
     `Company: ${context.companyName}\nIndustry: ${context.industry}\nRegion: ${context.region}\n\n` +
-    `Full metrics across all analyzed platforms:\n${JSON.stringify(perPlatformMetrics, null, 2)}\n\n` +
-    `Detailed-report findings already produced for this analysis (use these as grounding, don't contradict them):\n` +
-    JSON.stringify(crossPlatformInsights, null, 2);
+    `Metrics across all analyzed platforms (target + up to 3 competitors per platform, current window):\n` +
+    JSON.stringify(perPlatformMetrics, null, 2);
 
-  const content = await callCustomerReportTool(prompt);
+  const { platform_observations, ...content } = await generateStructured<SynthesisOutput>(
+    SYSTEM_PROMPT,
+    REPORT_TOOL.input_schema,
+    prompt,
+    REPORT_TOOL.name,
+  );
 
   const supabase = getSupabaseClient();
+  assertOk(
+    await supabase.from("analysis_insights").upsert(
+      perPlatformMetrics.map((metrics) => ({
+        analysis_id: analysisId,
+        platform: metrics.platform,
+        metrics,
+        data_observations: platform_observations.find((p) => p.platform === metrics.platform)?.observations ?? [],
+        explanations: [],
+        recommendations: [],
+      })),
+      { onConflict: "analysis_id,platform" },
+    ),
+    "Saving platform metrics and observations",
+  );
   assertOk(
     await supabase.from("analysis_reports").upsert(
       [{ analysis_id: analysisId, report_type: "customer" as const, content }],
       { onConflict: "analysis_id,report_type" },
     ),
-    "Saving customer report",
+    "Saving report",
   );
-}
-
-export async function synthesizeCrossPlatformInsights(
-  analysisId: string,
-  context: AnalysisContext,
-  perPlatformMetrics: { platform: Platform; accounts: AccountMetrics[] }[],
-): Promise<Insights> {
-  const prompt =
-    `Company: ${context.companyName}\nIndustry: ${context.industry}\nRegion: ${context.region}\n\n` +
-    `Metrics across all analyzed platforms (target + up to 3 competitors per platform):\n` +
-    JSON.stringify(perPlatformMetrics, null, 2) +
-    `\n\nSynthesize across platforms — where does the picture agree or diverge between platforms? Call that out ` +
-    `explicitly rather than just repeating each platform's findings separately.`;
-
-  const insights = await callSynthesisTool(prompt);
-
-  const supabase = getSupabaseClient();
-  assertOk(
-    await supabase.from("analysis_insights").upsert(
-      [
-        {
-          analysis_id: analysisId,
-          platform: "all",
-          metrics: { platforms: perPlatformMetrics.map((m) => m.platform) },
-          data_observations: insights.data_observations,
-          explanations: insights.explanations,
-          recommendations: insights.recommendations,
-        },
-      ],
-      { onConflict: "analysis_id,platform" },
-    ),
-    "Saving cross-platform insights",
-  );
-
-  return insights;
 }

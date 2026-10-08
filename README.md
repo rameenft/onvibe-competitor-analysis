@@ -3,19 +3,11 @@
 ## What this is
 
 A web app that takes a business (name, industry, location, social handles) plus up to
-three competitors, and produces two reports:
-
-1. **A detailed report** — full methodology, all charts, and every metric behind the
-   findings, split into three explicit sections: **what the data show**, **what we
-   believe may explain it**, and **what we recommend testing**.
-   [Detailed report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/detailed.pdf)
-2. **A customer-facing report** (OnVibe-branded) — condensed to what a client actually
-   needs: the 3 most important findings, content patterns that are working, competitive
-   gaps, 3-5 experiments to run next, and a 30/60/90-day plan with success metrics.
-   [Customer-facing report (PDF)](https://ebqjomghuarqtbxkoevr.supabase.co/storage/v1/object/public/reports/a4be3358-acd4-42af-9a78-69dd415aafc5/customer.pdf)
-
-Both are viewable in-browser and downloadable as PDFs.
-
+three competitors, and produces one report, viewable in the browser and downloadable as a PDF.
+It opens with the three most important findings, then goes platform by platform (a scoreboard
+of followers, engagement rate and reach, charts, and metric-cited observations), then covers
+content patterns that are working, competitive gaps, 3-5 experiments to run next, and a
+30/60/90-day plan with success metrics.
 
 Runs locally (see [Running it](#running-it)).
 
@@ -31,16 +23,13 @@ Runs locally (see [Running it](#running-it)).
    collaboration, campaign, paid promotion, product, testimonial, educational, or other.
    The prompt (`prompts/classify.json`) defines each category and gives ordered
    tie-break rules for posts that fit more than one.
-5. **Metrics** — engagement rate, percentile rank against the competitor set, weekly
-   growth, media-type performance (reels vs. photos vs. carousel), and collaboration
+5. **Metrics** — engagement rate, percentile rank against the competitor set, media-type performance (reels vs. photos vs. carousel), and collaboration
    cadence vs. each account's own organic baseline. Includes a built-in "sense-making"
    guard: an account with a high engagement rate but a tiny audience or a handful of
    interactions gets flagged as low-sample, so a small account never reads as
    "outperforming" when it's really just a thin sample.
-6. **Synthesis** (Gemini) — turns the metrics into the data/explanation/recommendation
-   writeup for the detailed report, plus a separate pass that produces the condensed
-   customer-report structure.
-7. **PDF rendering** (Playwright) — captures the live report pages and uploads both PDFs
+6. **Synthesis** (Gemini) — one call turns the metrics into the whole report.
+7. **PDF rendering** (Playwright) — captures the live report page and uploads the PDF
    to storage.
 
 Everything runs as a background worker process, not inside the web request — so a
@@ -79,7 +68,7 @@ Gemini (`gemini-3.8-flash`), and adds two things the pipeline didn't have:
   in Supabase (`supabase/kg_schema.sql`). Built from 732 real posts: 2,677 nodes and 6,903 edges,
   for $0.44. It answers questions the flat metrics can't, such as which topics competitors do well
   with that the target never posts about.
-  The customer report shows those topic gaps (`lib/kg.ts`, read live from Supabase) once the graph has
+  The report shows those topic gaps (`lib/kg.ts`, read live from Supabase) once the graph has
   been built for that analysis: run `python -m onvibe_ml kg build --persist` in `ml/` after an analysis
   finishes. Without it the report simply omits the section.
 
@@ -87,12 +76,11 @@ Setup, commands and full results are in [ml/README.md](ml/README.md).
 
 ## Tech stack
 
-- **Next.js (TypeScript)** — the web app (form, status page, both report pages)
+- **Next.js (TypeScript)** — the web app (form, status page, report page)
 - **A standalone worker process** — runs the actual pipeline in the background
 - **Supabase (Postgres)** — all data: analyses, accounts, posts, computed metrics,
   generated reports
-- **Apify** — scraping (Instagram/TikTok/LinkedIn actors + a Social Blade actor for
-  growth history)
+- **Apify** — scraping (Instagram/TikTok/LinkedIn actors)
 - **Gemini** (`gemini-3.8-flash`, Google GenAI SDK) — content classification and report
   synthesis
 - **Playwright** — renders the live report pages to PDF
@@ -105,16 +93,14 @@ Setup, commands and full results are in [ml/README.md](ml/README.md).
 app/                        Next.js app -- pages and API routes
   page.tsx                    Intake form (company/competitors/handles)
   analyses/[id]/page.tsx      Status page (polls pipeline progress)
-  analyses/[id]/report/       The two report pages (detailed, customer)
+  analyses/[id]/report/       The report page
   api/analyses/               Create-analysis and status-check endpoints
   api/validate-handles/       Pre-flight handle validation endpoint
 
 worker/                     The background pipeline (a separate always-on process)
   index.ts                    Polls for new analyses and runs the pipeline
-  platforms/                  One file per platform (instagram/tiktok/linkedin) plus
-                               socialblade.ts for historical growth data -- each
-                               implements the same fetchProfile/fetchPosts/
-                               fetchHistoricalSnapshots interface
+  platforms/                  One file per platform (instagram/tiktok/linkedin), each
+                               implementing the same fetchProfile/fetchPosts interface
   pipeline/                   scrape -> classify -> metrics -> synthesize -> render,
                                one file per pipeline stage
 
@@ -125,7 +111,7 @@ lib/                        Shared code used by both app/ and worker/
   types.ts                     Shared TypeScript types (database rows, metrics shapes)
 
 components/
-  charts/                      The four chart components (Recharts)
+  charts/                      The chart components (Recharts)
   reports/                     Report-page building blocks, including OnVibe's brand
                                colors (brand.ts) and the PDF-capture readiness marker
 

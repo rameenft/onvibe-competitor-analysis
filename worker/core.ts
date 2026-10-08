@@ -2,12 +2,8 @@ import { assertOk, getSupabaseClient } from "../lib/supabase";
 import { scrapeAllAccounts } from "./pipeline/scrape";
 import { classifyAll } from "./pipeline/classify";
 import { computePlatformMetrics } from "./pipeline/metrics";
-import {
-  synthesizePlatformInsights,
-  synthesizeCrossPlatformInsights,
-  synthesizeCustomerReport,
-} from "./pipeline/synthesize";
-import { renderReports } from "./pipeline/render";
+import { synthesizeReport } from "./pipeline/synthesize";
+import { renderReport } from "./pipeline/render";
 import type { Account, Analysis, Platform } from "../lib/types";
 
 const STUCK_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -16,7 +12,7 @@ const NON_TERMINAL_STATUSES = ["scraping", "categorizing", "computing", "synthes
 // Crash recovery, kept intentionally cheap: anything stuck in a
 // non-terminal status past the timeout gets marked failed for a manual
 // retry, rather than building full step-checkpointing. Idempotent
-// upserts (posts, snapshots, post_categories) already make a retried run
+// upserts (posts, post_categories) already make a retried run
 // safe to re-run from scratch.
 //
 // Checks updated_at (last activity), not created_at (time of creation) --
@@ -87,7 +83,7 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
       region: analysis.region,
     };
 
-    await updateStatus(analysis.id, "scraping", "Scraping profiles, posts, and historical growth...");
+    await updateStatus(analysis.id, "scraping", "Scraping profiles and posts...");
     await scrapeAllAccounts(accountList, analysis.window_days);
 
     await updateStatus(analysis.id, "categorizing", "Classifying post content with Gemini...");
@@ -98,18 +94,11 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
       platforms.map((platform) => computePlatformMetrics(accountList, platform, analysis.window_days)),
     );
 
-    await updateStatus(analysis.id, "synthesizing", "Synthesizing insights with Gemini...");
-    for (const metrics of perPlatformMetrics) {
-      await synthesizePlatformInsights(analysis.id, metrics.platform, context, metrics);
-    }
-    // Always write an 'all' rollup row, even for a single-platform analysis,
-    // so report pages can rely on it existing rather than branching on
-    // platform count.
-    const crossPlatformInsights = await synthesizeCrossPlatformInsights(analysis.id, context, perPlatformMetrics);
-    await synthesizeCustomerReport(analysis.id, context, perPlatformMetrics, crossPlatformInsights);
+    await updateStatus(analysis.id, "synthesizing", "Writing the report with Gemini...");
+    await synthesizeReport(analysis.id, context, perPlatformMetrics);
 
-    await updateStatus(analysis.id, "rendering", "Rendering reports...");
-    await renderReports(analysis.id);
+    await updateStatus(analysis.id, "rendering", "Rendering the PDF...");
+    await renderReport(analysis.id);
 
     assertOk(
       await supabase
