@@ -79,6 +79,9 @@ Gemini (`gemini-3.8-flash`), and adds two things the pipeline didn't have:
   in Supabase (`supabase/kg_schema.sql`). Built from 732 real posts: 2,677 nodes and 6,903 edges,
   for $0.44. It answers questions the flat metrics can't, such as which topics competitors do well
   with that the target never posts about.
+  The customer report shows those topic gaps (`lib/kg.ts`, read live from Supabase) once the graph has
+  been built for that analysis: run `python -m onvibe_ml kg build --persist` in `ml/` after an analysis
+  finishes. Without it the report simply omits the section.
 
 Setup, commands and full results are in [ml/README.md](ml/README.md).
 

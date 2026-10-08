@@ -4,6 +4,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { ReportReadyMarker } from "@/components/reports/ReportReadyMarker";
 import { OnVibeLetterhead } from "@/components/reports/OnVibeLetterhead";
 import { ONVIBE_BRAND } from "@/components/reports/brand";
+import { getTopicGaps, type TopicGapsResult } from "@/lib/kg";
 import type { CustomerReportContent } from "@/lib/types";
 
 interface Props {
@@ -27,7 +28,40 @@ function Section({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-const PLAN_ACCENTS = [ONVIBE_BRAND.yellow, ONVIBE_BRAND.teal, ONVIBE_BRAND.coral];
+// Lift is relative to each account's own median, so a small account's one viral post can read as 40x.
+// Past 10x the exact figure says nothing more, so don't print it.
+function formatLift(lift: number): string {
+  return lift >= 10 ? "over 10×" : `${lift.toFixed(1)}×`;
+}
+
+function TopicGaps({ result }: { result: TopicGapsResult }) {
+  if (result.gaps.length === 0) return null;
+  return (
+    <section className="mt-10">
+      <h2 className="text-lg font-bold" style={{ color: ONVIBE_BRAND.teal }}>
+        Topics your competitors win on that you haven&apos;t covered
+      </h2>
+      <ul className="mt-3 space-y-3 text-sm leading-relaxed">
+        {result.gaps.map((gap) => (
+          <li key={gap.topic}>
+            <span className="font-semibold">{gap.topic}</span>
+            <span className="text-neutral-500">
+              {" "}
+              · {gap.accounts.join(", ")} · {gap.postCount} posts earning {formatLift(gap.medianLift)} their
+              usual engagement
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-xs text-neutral-400">
+        From {result.competitorPostCount} competitor posts. Each topic rests on a handful of posts, so treat it as
+        a lead to test rather than a conclusion.
+      </p>
+    </section>
+  );
+}
+
+const PLAN_ACCENTS =[ONVIBE_BRAND.yellow, ONVIBE_BRAND.teal, ONVIBE_BRAND.coral];
 
 function PlanPhaseCard({
   label,
@@ -93,6 +127,15 @@ export default async function CustomerReportPage({ params, searchParams }: Props
     );
   }
 
+  // The graph is optional enrichment built offline; a missing or unreadable graph must never
+  // stop the report (or its PDF render) from showing.
+  let topicGaps: TopicGapsResult | null = null;
+  try {
+    topicGaps = await getTopicGaps(id);
+  } catch (error) {
+    console.error(`Knowledge graph unavailable for analysis ${id}:`, error);
+  }
+
   return (
     <main className={`mx-auto max-w-2xl ${isPrint ? "pb-10" : "pb-12"}`}>
       <ReportReadyMarker />
@@ -113,6 +156,7 @@ export default async function CustomerReportPage({ params, searchParams }: Props
         <Section title="The three most important things we learned" items={content.key_findings} />
         <Section title="Content patterns that appear to be working" items={content.working_content_patterns} />
         <Section title="Your most important competitive gaps" items={content.competitive_gaps} />
+        {topicGaps && <TopicGaps result={topicGaps} />}
         <Section title="Experiments to run next" items={content.experiments} />
 
         <section className="mt-10">
