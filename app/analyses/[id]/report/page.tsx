@@ -247,13 +247,16 @@ export default async function CustomerReportPage({ params, searchParams }: Props
     );
   }
 
-  // The graph is optional enrichment built offline; a missing or unreadable graph must never
+  // The gaps stored with the report are the ones its writing was based on. Reports from before
+  // that field existed read the graph live; either way a missing or unreadable graph must never
   // stop the report (or its PDF render) from showing.
-  let topicGaps: TopicGapsResult | null = null;
-  try {
-    topicGaps = await getTopicGaps(id);
-  } catch (error) {
-    console.error(`Knowledge graph unavailable for analysis ${id}:`, error);
+  let topicGaps: TopicGapsResult | null = content.topic_gaps ?? null;
+  if (content.topic_gaps === undefined) {
+    try {
+      topicGaps = await getTopicGaps(id);
+    } catch (error) {
+      console.error(`Knowledge graph unavailable for analysis ${id}:`, error);
+    }
   }
 
   return (

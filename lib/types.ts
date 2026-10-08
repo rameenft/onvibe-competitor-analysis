@@ -1,3 +1,5 @@
+import type { TopicGapsResult } from "./kg";
+
 export type Platform = "instagram" | "tiktok" | "linkedin";
 export type AccountRole = "target" | "competitor";
 export type AnalysisStatus =
@@ -95,6 +97,9 @@ export interface ReportContent {
   working_content_patterns: string[];
   competitive_gaps: string[];
   experiments: string[];
+  // The gaps the writing above was based on, so the page shows exactly those. null = this run
+  // built no graph; absent = a report from before this field, which falls back to reading the graph.
+  topic_gaps?: TopicGapsResult | null;
   plan: { day30: PlanPhase; day60: PlanPhase; day90: PlanPhase };
 }
 

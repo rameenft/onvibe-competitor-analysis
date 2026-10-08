@@ -182,7 +182,16 @@ export async function synthesizeReport(
   );
   assertOk(
     await supabase.from("analysis_reports").upsert(
-      [{ analysis_id: analysisId, report_type: "customer" as const, content }],
+      [
+        {
+          analysis_id: analysisId,
+          report_type: "customer" as const,
+          content: {
+            ...content,
+            topic_gaps: graph ? { gaps: graph.gaps, competitorPostCount: graph.competitorPostCount } : null,
+          },
+        },
+      ],
       { onConflict: "analysis_id,report_type" },
     ),
     "Saving report",
