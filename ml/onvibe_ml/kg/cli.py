@@ -1,7 +1,10 @@
+import contextlib
+import json
+import sys
 from collections import Counter
 
 from ..config import REPORTS_DIR, default_model
-from ..db import load_corpus
+from ..db import load_analysis_corpus, load_corpus
 from ..llm import Usage
 from . import extract, queries, store
 from .graph import GraphBuilder
@@ -60,6 +63,40 @@ def build(model: str, persist: bool) -> None:
         print(f"\nTopic canonicalization: {usage.summary(model)}")
     if persist:
         store.save_supabase(g, builder.aliases)
+
+
+def build_analysis(analysis_id: str, model: str, persist: bool, as_json: bool) -> None:
+    """Build the graph for one analysis (extracting entities for any posts not cached yet) and print
+    its topic gaps. With --persist, upserts into Supabase without touching other analyses' rows.
+    Unlike a full build it writes no local graph or kg_summary.md, since those hold the whole graph.
+    With --json stdout carries only the gaps JSON; everything else goes to stderr."""
+    with contextlib.redirect_stdout(sys.stderr) if as_json else contextlib.nullcontext():
+        try:
+            corpus = load_analysis_corpus(analysis_id)
+        except LookupError as exc:
+            raise SystemExit(str(exc)) from exc
+        posts = _unique_posts(corpus, None)
+        handle_of = {aid: a["handle"] for aid, a in corpus["accounts"].items()}
+        cached, usage, _ = extract.extract(posts, handle_of, model)
+        print(f"Entity extraction: {usage.summary(model) if usage.calls else 'all posts already cached'}")
+        extractions = {p["post_url"]: cached[p["post_url"]] for p in posts if p["post_url"] in cached}
+
+        topics = Counter(t for row in extractions.values() for t in row["topics"])
+        topic_usage = Usage()
+        topic_map = canonicalize_topics(topics, model, topic_usage) if topics else {}
+        builder = GraphBuilder(corpus, extractions, topic_map)
+        g = builder.build()
+        data = queries.topic_gap_data(g, analysis_id)
+        if data is None:
+            raise SystemExit(f"Analysis {analysis_id} has no target/competitor pair on the same platform, so there is nothing to compare.")
+        print(f"Graph for analysis {analysis_id}: {g.number_of_nodes()} nodes, {g.number_of_edges()} edges, {len(data['gaps'])} topic gaps.")
+        if persist:
+            post_nodes = [nid for nid, node in g.nodes(data=True) if node["type"] == "post"]
+            store.save_supabase_analysis(g, builder.aliases, analysis_id, post_nodes)
+    if as_json:
+        print(json.dumps(data))
+    else:
+        print(queries.topic_gaps(g, analysis_id))
 
 
 def summary(g, builder: GraphBuilder, topics: Counter, topic_map: dict, extractions: dict, corpus: dict) -> str:
@@ -130,7 +167,12 @@ def run(args) -> None:
     if args.action == "extract":
         run_extract(model, args.analysis)
     elif args.action == "build":
-        build(model, args.persist)
+        if args.analysis:
+            build_analysis(args.analysis, model, args.persist, args.json)
+        elif args.json:
+            raise SystemExit("--json needs --analysis <analysis id>")
+        else:
+            build(model, args.persist)
     else:
         g = store.load_local()
         if args.query == "gaps":

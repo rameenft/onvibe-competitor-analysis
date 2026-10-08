@@ -6,7 +6,11 @@
   eval classify [--model M] score production (and optionally model M) against hand labels
   eval agreement --model M  label-free: how often model M agrees with production
   kg extract                LLM entity extraction for posts not yet extracted (cached)
-  kg build [--persist]      resolve entities, build the graph, write ml/reports/kg_summary.md
+  kg build [--persist]      resolve entities, build the whole graph, write ml/reports/kg_summary.md
+                            (--persist replaces every graph table in Supabase)
+  kg build --analysis ID [--persist] [--json]
+                            extract (cached) + build one analysis' graph; --persist upserts only that
+                            analysis' rows; --json prints its topic gaps as JSON on stdout
   kg query gaps|collabs|entity  example questions over the graph
 """
 
@@ -33,9 +37,10 @@ def main() -> None:
     kg.add_argument("action", choices=["extract", "build", "query"])
     kg.add_argument("query", nargs="?", choices=["gaps", "collabs", "entity"])
     kg.add_argument("--model", default=None)
-    kg.add_argument("--analysis", help="limit extraction / gap analysis to one analysis id")
+    kg.add_argument("--analysis", help="limit extraction / gap analysis to one analysis id; with `kg build`, build only that analysis")
     kg.add_argument("--name", help="entity name for `kg query entity`")
     kg.add_argument("--persist", action="store_true", help="also write nodes/edges to Supabase")
+    kg.add_argument("--json", action="store_true", help="with `kg build --analysis`, print topic gaps as JSON on stdout")
 
     args = parser.parse_args()
 

@@ -15,14 +15,15 @@ def _targets(g: nx.MultiDiGraph, post: str, edge_type: str) -> list[str]:
     return [dst for _, dst, data in g.out_edges(post, data=True) if data["type"] == edge_type]
 
 
-def analysis_accounts(g: nx.MultiDiGraph, analysis_id: str) -> tuple[str | None, list[str]]:
-    """(target account, competitor accounts) for one analysis, from its COMPETES_WITH edges."""
-    target, rivals = None, []
+def analysis_accounts(g: nx.MultiDiGraph, analysis_id: str) -> tuple[list[str], list[str]]:
+    """(target accounts, competitor accounts) for one analysis, from its COMPETES_WITH edges.
+    An analysis with accounts on two platforms has one target per platform."""
+    targets, rivals = set(), set()
     for src, dst, data in g.edges(data=True):
         if data["type"] == "COMPETES_WITH" and data.get("analysis_id") == analysis_id:
-            target = src
-            rivals.append(dst)
-    return target, sorted(set(rivals))
+            targets.add(src)
+            rivals.add(dst)
+    return sorted(targets), sorted(rivals)
 
 
 def topic_table(g: nx.MultiDiGraph, accounts: list[str]) -> dict[str, dict[str, list[float]]]:
@@ -36,39 +37,62 @@ def topic_table(g: nx.MultiDiGraph, accounts: list[str]) -> dict[str, dict[str, 
     return table
 
 
-def topic_gaps(g: nx.MultiDiGraph, analysis_id: str, min_posts: int = 3) -> str:
-    """Topics competitors post about that work for them (lift > 1) and the target never covers,
-    plus topics only the target covers. Lift = post engagement / that account's median, so it's
-    comparable across accounts of very different size."""
-    target, rivals = analysis_accounts(g, analysis_id)
-    if not target:
-        return f"No analysis {analysis_id} in the graph."
-    table = topic_table(g, [target, *rivals])
+def topic_gap_data(g: nx.MultiDiGraph, analysis_id: str, min_posts: int = 3) -> dict | None:
+    """Topics competitors post about that work for them (median lift >= 1) and no target covers,
+    plus topics only the targets cover. Lift = post engagement / that account's median, so it's
+    comparable across accounts of very different size. None if the analysis isn't in the graph.
+
+    The "gaps" entries use the same keys as TopicGap in lib/kg.ts (same cutoffs and ordering as
+    computeTopicGaps there), so the TypeScript side can read this output as-is."""
+    targets, rivals = analysis_accounts(g, analysis_id)
+    if not targets:
+        return None
+    table = topic_table(g, [*targets, *rivals])
 
     gaps, owned = [], []
     for topic, by_account in table.items():
         rival_lifts = [lift for a in rivals for lift in by_account.get(a, [])]
-        target_lifts = by_account.get(target, [])
+        target_lifts = [lift for a in targets for lift in by_account.get(a, [])]
+        name = g.nodes[topic]["name"]
         if not target_lifts and len(rival_lifts) >= min_posts:
             median = statistics.median(rival_lifts)
             if median >= 1.0:
-                who = sorted({g.nodes[a]["name"] for a in rivals if by_account.get(a)})
-                gaps.append((median, len(rival_lifts), g.nodes[topic]["name"], who))
+                who = sorted(g.nodes[a]["name"] for a in rivals if by_account.get(a))
+                gaps.append({"topic": name, "medianLift": round(median, 3), "postCount": len(rival_lifts), "accounts": who})
         if target_lifts and not rival_lifts:
-            owned.append((statistics.median(target_lifts), len(target_lifts), g.nodes[topic]["name"]))
+            owned.append({"topic": name, "medianLift": round(statistics.median(target_lifts), 3), "postCount": len(target_lifts)})
 
-    lines = [f"Topic gaps for {g.nodes[target]['name']} vs {', '.join(g.nodes[r]['name'] for r in rivals)}", ""]
+    gaps.sort(key=lambda r: (-r["medianLift"], -r["postCount"], r["topic"]))
+    owned.sort(key=lambda r: (-r["medianLift"], -r["postCount"], r["topic"]))
+    rival_posts = {post for a in rivals for post in _posts_of(g, a)}
+    return {
+        "analysisId": analysis_id,
+        "targets": [g.nodes[a]["name"] for a in targets],
+        "competitors": [g.nodes[a]["name"] for a in rivals],
+        "gaps": gaps,
+        "targetOnlyTopics": owned,
+        "competitorPostCount": len(rival_posts),
+    }
+
+
+def topic_gaps(g: nx.MultiDiGraph, analysis_id: str, min_posts: int = 3) -> str:
+    """topic_gap_data() as a readable report."""
+    data = topic_gap_data(g, analysis_id, min_posts)
+    if not data:
+        return f"No analysis {analysis_id} in the graph."
+
+    lines = [f"Topic gaps for {', '.join(data['targets'])} vs {', '.join(data['competitors'])}", ""]
     lines.append("Topics competitors use with above-median engagement that the target never posts about:")
     lines.append(f"{'median lift':>12}  {'posts':>5}  topic  (who)")
-    for median, n, name, who in sorted(gaps, reverse=True)[:15]:
-        lines.append(f"{median:>12.2f}  {n:>5}  {name}  ({', '.join(who)})")
-    if not gaps:
+    for gap in data["gaps"][:15]:
+        lines.append(f"{gap['medianLift']:>12.2f}  {gap['postCount']:>5}  {gap['topic']}  ({', '.join(gap['accounts'])})")
+    if not data["gaps"]:
         lines.append("  (none)")
     lines.append("")
     lines.append("Topics only the target covers:")
-    for median, n, name in sorted(owned, reverse=True)[:10]:
-        lines.append(f"{median:>12.2f}  {n:>5}  {name}")
-    if not owned:
+    for topic in data["targetOnlyTopics"][:10]:
+        lines.append(f"{topic['medianLift']:>12.2f}  {topic['postCount']:>5}  {topic['topic']}")
+    if not data["targetOnlyTopics"]:
         lines.append("  (none)")
     return "\n".join(lines)
 

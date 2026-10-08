@@ -36,7 +36,8 @@ evals compare providers. Run everything from `ml/` as `.venv/bin/python -m onvib
 | `eval classify --model claude-haiku-4-5` | LLM | Also re-runs the production prompt with another model on the same posts |
 | `eval agreement --model M` | LLM | Label-free: how often model M agrees with production |
 | `kg extract [--analysis ID]` | LLM | Entity extraction, cached per post |
-| `kg build [--persist]` | ~1 LLM call | Resolves entities, builds the graph, writes `reports/kg_summary.md`; `--persist` writes to Supabase |
+| `kg build [--persist]` | ~1 LLM call | Resolves entities, builds the graph, writes `reports/kg_summary.md`; `--persist` **replaces** the graph tables in Supabase |
+| `kg build --analysis ID [--persist] [--json]` | LLM for uncached posts + ~1 call | Builds one analysis' graph (extracting any uncached posts first). `--persist` upserts only that analysis' rows and never wipes the rest; `--json` prints its topic gaps as JSON on stdout (logs go to stderr). Writes no local graph or `kg_summary.md`. This is the mode the pipeline calls |
 | `kg query gaps --analysis ID` | free | Topics competitors win on that the target never covers |
 | `kg query collabs` / `kg query entity --name X` | free | Shared collaborators / one entity's neighborhood |
 

@@ -1,8 +1,11 @@
+import json
 from collections import Counter
+
+import pytest
 
 from onvibe_ml.kg import extract
 from onvibe_ml.kg.graph import GraphBuilder, account_node, post_node
-from onvibe_ml.kg.queries import topic_gaps
+from onvibe_ml.kg.queries import topic_gap_data, topic_gaps
 from onvibe_ml.kg.resolve import canonicalize_topics, match_account, normalize, resolve_names
 from onvibe_ml.llm import Usage
 
@@ -165,3 +168,117 @@ def test_topic_gaps_finds_competitor_only_topics():
     gaps_section, owned_section = report.split("Topics only the target covers:")
     assert "phone cleanup" in gaps_section and "@rivalco" in gaps_section
     assert "photo backup" in owned_section
+
+
+def test_topic_gap_data_matches_the_ts_shape_and_handles_several_targets():
+    g = GraphBuilder(_corpus(), EXTRACTIONS).build()
+    data = topic_gap_data(g, "an1", min_posts=3)
+    assert data["targets"] == ["@acme.app"] and data["competitors"] == ["@rivalco"]
+    assert data["gaps"] == [{"topic": "phone cleanup", "medianLift": 1.0, "postCount": 3, "accounts": ["@rivalco"]}]
+    assert [t["topic"] for t in data["targetOnlyTopics"]] == ["photo backup"]
+    assert data["competitorPostCount"] == 3
+    assert topic_gap_data(g, "nope") is None
+
+    # A target that covers a topic on either platform closes the gap.
+    g.add_node("account:tiktok:acme.app", type="account", name="@acme.app")
+    g.add_edge("account:tiktok:acme.app", account_node("instagram", "rivalco"), key="COMPETES_WITH:an1", type="COMPETES_WITH", analysis_id="an1")
+    assert len(topic_gap_data(g, "an1")["targets"]) == 2
+
+
+class FakeQuery:
+    def __init__(self, db, table):
+        self.db, self.table, self.op, self.filters = db, table, "select", []
+
+    def select(self, *_):
+        return self
+
+    def delete(self):
+        self.op = "delete"
+        return self
+
+    def upsert(self, rows, on_conflict=None):
+        self.db.log.append(("upsert", self.table, len(rows), on_conflict))
+        self.op = "upsert"
+        return self
+
+    def in_(self, column, values):
+        self.filters.append((column, "in", list(values)))
+        return self
+
+    def eq(self, column, value):
+        self.filters.append((column, "eq", value))
+        return self
+
+    def limit(self, _):
+        return self
+
+    def execute(self):
+        if self.op == "delete":
+            self.db.log.append(("delete", self.table, self.filters))
+        data = self.db.existing.get(self.table, []) if self.op == "select" else []
+        return type("R", (), {"data": data})
+
+
+class FakeDb:
+    def __init__(self, existing=None):
+        self.log, self.existing = [], existing or {}
+
+    def table(self, name):
+        return FakeQuery(self, name)
+
+
+def test_save_supabase_analysis_upserts_without_wiping_and_widens_seen_range(monkeypatch):
+    from onvibe_ml.kg import store
+
+    g = GraphBuilder(_corpus(), EXTRACTIONS).build()
+    captured = []
+    db = FakeDb({"kg_nodes": [{"id": "topic:phone cleanup", "first_seen": "2026-01-01T00:00:00+00:00", "last_seen": "2026-01-02T00:00:00+00:00"}]})
+    monkeypatch.setattr(store, "client", lambda: db)
+    orig = store._merge_seen
+    monkeypatch.setattr(store, "_merge_seen", lambda d, nodes: (orig(d, nodes), captured.extend(nodes)))
+
+    posts = [n for n, d in g.nodes(data=True) if d["type"] == "post"]
+    store.save_supabase_analysis(g, [], "an1", posts)
+
+    deletes = [e for e in db.log if e[0] == "delete"]
+    # Only edges from this analysis' posts / its own COMPETES_WITH are deleted; never a table-wide wipe.
+    assert all(any(f[0] in ("src", "dst", "analysis_id") for f in e[2]) for e in deletes)
+    assert ("analysis_id", "eq", "an1") in deletes[-1][2]
+    assert not any(e[1] == "kg_nodes" for e in deletes)
+    # Upserts keyed on the deterministic ids; nodes go in before edges (FK order).
+    upserts = [e for e in db.log if e[0] == "upsert"]
+    assert [u[1] for u in upserts][:1] == ["kg_nodes"] and ("upsert", "kg_edges", g.number_of_edges(), "id") in upserts
+    # The topic's first_seen stays at the earlier stored date; last_seen moves to the new post.
+    topic = next(n for n in captured if n["id"] == "topic:phone cleanup")
+    assert topic["first_seen"] == "2026-01-01T00:00:00+00:00"
+    assert topic["last_seen"] == "2026-06-05T00:00:00Z"
+
+
+def test_build_analysis_json_mode_keeps_stdout_clean_and_writes_no_local_graph(monkeypatch, capsys, tmp_path):
+    from onvibe_ml.kg import cli, store
+
+    monkeypatch.setattr(cli, "load_analysis_corpus", lambda _id: _corpus())
+    monkeypatch.setattr(cli.extract, "extract", lambda posts, handle_of, model: (EXTRACTIONS, Usage(), {}))
+    monkeypatch.setattr(cli, "canonicalize_topics", lambda *a: {})
+    monkeypatch.setattr(store, "GRAPH_PATH", tmp_path / "graph.json")
+    monkeypatch.setattr(cli, "REPORTS_DIR", tmp_path)
+    persisted = []
+    monkeypatch.setattr(store, "save_supabase_analysis", lambda g, aliases, aid, posts: (print("noise"), persisted.append((aid, len(posts)))))
+
+    cli.build_analysis("an1", "fake", persist=True, as_json=True)
+    out, err = capsys.readouterr()
+    assert json.loads(out)["gaps"][0]["topic"] == "phone cleanup"  # stdout is JSON and nothing else
+    assert "noise" in err and persisted == [("an1", 6 - 1)]
+    assert list(tmp_path.iterdir()) == []  # no local graph.json, no kg_summary.md
+
+
+def test_build_analysis_rejects_an_analysis_with_no_competitors(monkeypatch):
+    from onvibe_ml.kg import cli
+
+    corpus = _corpus()
+    corpus["accounts"].pop("c")
+    corpus["posts"] = [p for p in corpus["posts"] if p["account_id"] == "t"]
+    monkeypatch.setattr(cli, "load_analysis_corpus", lambda _id: corpus)
+    monkeypatch.setattr(cli.extract, "extract", lambda posts, handle_of, model: ({}, Usage(), {}))
+    with pytest.raises(SystemExit, match="nothing to compare"):
+        cli.build_analysis("an1", "fake", persist=False, as_json=True)
