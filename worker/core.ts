@@ -1,6 +1,7 @@
 import { assertOk, getSupabaseClient } from "../lib/supabase";
 import { scrapeAllAccounts } from "./pipeline/scrape";
 import { classifyAll } from "./pipeline/classify";
+import { buildKnowledgeGraph } from "./pipeline/graph";
 import { computePlatformMetrics } from "./pipeline/metrics";
 import { synthesizeReport } from "./pipeline/synthesize";
 import { renderReport } from "./pipeline/render";
@@ -88,6 +89,11 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
 
     await updateStatus(analysis.id, "categorizing", "Classifying post content with Gemini...");
     await classifyAll(accountList.map((a) => a.id));
+
+    // Same status as classification: the graph needs the categories, and a new status would need a
+    // schema change. A failed build only means the report has no topic-gaps section.
+    await updateStatus(analysis.id, "categorizing", "Building the knowledge graph...");
+    await buildKnowledgeGraph(analysis.id);
 
     await updateStatus(analysis.id, "computing", "Computing metrics...");
     const perPlatformMetrics = await Promise.all(
