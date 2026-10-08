@@ -8,7 +8,7 @@ import { CompetitiveLandscapeChart } from "@/components/charts/CompetitiveLandsc
 import { MediaTypeChart } from "@/components/charts/MediaTypeChart";
 import { CategoryPerformanceChart } from "@/components/charts/CategoryPerformanceChart";
 import { ViewsPerformanceChart } from "@/components/charts/ViewsPerformanceChart";
-import { getTopicGaps, type TopicGapsResult } from "@/lib/kg";
+import { getTopicGaps, groupGapsByCompetitor, type TopicGapsResult } from "@/lib/kg";
 import type { AccountMetrics, AnalysisInsights, Platform, ReportContent } from "@/lib/types";
 
 interface Props {
@@ -143,21 +143,28 @@ function formatLift(lift: number): string {
 }
 
 function TopicGaps({ result }: { result: TopicGapsResult }) {
-  if (result.gaps.length === 0) return null;
+  const competitors = groupGapsByCompetitor(result.gaps);
+  if (competitors.length === 0) return null;
   return (
     <section className="mt-10">
       <h2 className="text-lg font-bold" style={{ color: ONVIBE_BRAND.teal }}>
         Topics your competitors win on that you haven&apos;t covered
       </h2>
       <ul className="mt-3 space-y-3 text-sm leading-relaxed">
-        {result.gaps.map((gap) => (
-          <li key={gap.topic}>
-            <span className="font-semibold">{gap.topic}</span>
-            <span className="text-neutral-500">
-              {" "}
-              · {gap.accounts.join(", ")} · {gap.postCount} posts earning {formatLift(gap.medianLift)} their
-              usual engagement
-            </span>
+        {competitors.map(({ competitor, topics }) => (
+          <li key={competitor}>
+            <span className="font-semibold">{competitor}</span>
+            <span className="text-neutral-500"> · </span>
+            {topics.map((t, i) => (
+              <span key={t.topic}>
+                {i > 0 && <span className="text-neutral-500">; </span>}
+                {t.topic}
+                <span className="text-neutral-500">
+                  {" "}
+                  ({formatLift(t.medianLift)} usual engagement, {t.postCount} posts)
+                </span>
+              </span>
+            ))}
           </li>
         ))}
       </ul>

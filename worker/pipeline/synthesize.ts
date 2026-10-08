@@ -1,6 +1,8 @@
 import { generateStructured } from "../../lib/gemini";
+import { groupGapsByCompetitor } from "../../lib/kg";
 import { assertOk, getSupabaseClient } from "../../lib/supabase";
 import type { AccountMetrics, Platform, ReportContent } from "../../lib/types";
+import type { KgBuildResult } from "./graph";
 
 const PLAN_PHASE_SCHEMA = {
   type: "object" as const,
@@ -103,7 +105,15 @@ performers in the data are doing.
 5. experiments: 3-5 concrete experiments to run next, each specific enough to act on immediately.
 6. plan: a 30/60/90-day plan. Each phase needs concrete actions AND measurable success metrics (a specific number \
 or rate to hit, not "improve engagement"). Day 30 should be quick, low-risk tests; day 60 should build on what \
-worked; day 90 should be a clear checkpoint on whether the strategy is working.`;
+worked; day 90 should be a clear checkpoint on whether the strategy is working.
+
+When a "Topic gaps" section is provided, it comes from a knowledge graph built from the post captions: topics \
+competitors post about with above-normal engagement that the target never covers, grouped by competitor. Use it as \
+a second source next to the metrics: let the biggest gaps shape competitive_gaps, working_content_patterns and the \
+experiments (e.g. an experiment that tests one gap topic), and name the topic and the competitor. Each topic rests \
+on only a handful of posts, so frame them as leads to test, never as proven. Do not quote the lift or post-count \
+numbers from that section in your text: the report prints them next to your writing. If there is no "Topic gaps" \
+section, do not mention topics or a knowledge graph.`;
 
 interface AnalysisContext {
   companyName: string;
@@ -115,6 +125,24 @@ type SynthesisOutput = ReportContent & {
   platform_observations: { platform: Platform; observations: string[] }[];
 };
 
+/** The graph half of the prompt: topic gaps grouped per competitor, plus what only the target covers. Empty without a graph. */
+export function describeTopicGaps(graph: KgBuildResult | null): string {
+  if (!graph) return "";
+  const gaps = groupGapsByCompetitor(graph.gaps).map((c) => ({
+    competitor: c.competitor,
+    topics: c.topics.map((t) => ({ topic: t.topic, lift: Number(t.medianLift.toFixed(1)), posts: t.postCount })),
+  }));
+  const body =
+    gaps.length === 0
+      ? "No topic met the bar (3+ competitor posts at above-normal engagement that the target never covers)."
+      : `Topics each competitor wins on that the target has not covered (lift = engagement relative to that account's own typical post):\n${JSON.stringify(gaps, null, 2)}`;
+  const strengths = graph.targetOnlyTopics.slice(0, 5).map((t) => t.topic);
+  return (
+    `\n\nTopic gaps (from ${graph.competitorPostCount} competitor posts):\n${body}` +
+    (strengths.length ? `\nTopics only the target covers: ${strengths.join(", ")}` : "")
+  );
+}
+
 // One Gemini call for the whole report. Per-platform metrics go into
 // analysis_insights (the evals read them from there) with that platform's
 // observations; everything else is saved as the report content.
@@ -122,11 +150,13 @@ export async function synthesizeReport(
   analysisId: string,
   context: AnalysisContext,
   perPlatformMetrics: { platform: Platform; accounts: AccountMetrics[] }[],
+  graph: KgBuildResult | null,
 ): Promise<void> {
   const prompt =
     `Company: ${context.companyName}\nIndustry: ${context.industry}\nRegion: ${context.region}\n\n` +
     `Metrics across all analyzed platforms (target + up to 3 competitors per platform, current window):\n` +
-    JSON.stringify(perPlatformMetrics, null, 2);
+    JSON.stringify(perPlatformMetrics, null, 2) +
+    describeTopicGaps(graph);
 
   const { platform_observations, ...content } = await generateStructured<SynthesisOutput>(
     SYSTEM_PROMPT,

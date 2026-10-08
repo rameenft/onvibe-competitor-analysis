@@ -93,7 +93,7 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
     // Same status as classification: the graph needs the categories, and a new status would need a
     // schema change. A failed build only means the report has no topic-gaps section.
     await updateStatus(analysis.id, "categorizing", "Building the knowledge graph...");
-    await buildKnowledgeGraph(analysis.id);
+    const graph = await buildKnowledgeGraph(analysis.id);
 
     await updateStatus(analysis.id, "computing", "Computing metrics...");
     const perPlatformMetrics = await Promise.all(
@@ -101,7 +101,7 @@ export async function runAnalysis(analysis: Analysis): Promise<void> {
     );
 
     await updateStatus(analysis.id, "synthesizing", "Writing the report with Gemini...");
-    await synthesizeReport(analysis.id, context, perPlatformMetrics);
+    await synthesizeReport(analysis.id, context, perPlatformMetrics, graph);
 
     await updateStatus(analysis.id, "rendering", "Rendering the PDF...");
     await renderReport(analysis.id);

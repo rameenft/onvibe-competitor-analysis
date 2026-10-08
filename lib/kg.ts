@@ -79,6 +79,37 @@ export function computeTopicGaps(input: TopicGapInput, limit = 5): TopicGapsResu
   return { gaps: gaps.slice(0, limit), competitorPostCount };
 }
 
+export interface CompetitorTopics {
+  competitor: string;
+  topics: { topic: string; medianLift: number; postCount: number }[];
+}
+
+/**
+ * One entry per competitor: the gap topics it posts about, strongest first, so near-duplicate topics
+ * ("photo backup", "backing up photos") read as one line instead of several. A topic several
+ * competitors share appears under each of them with the combined lift and post count. Competitors
+ * are ordered by their strongest topic, and each keeps its top `perCompetitor` topics.
+ */
+export function groupGapsByCompetitor(gaps: TopicGap[], perCompetitor = 4): CompetitorTopics[] {
+  const byCompetitor = new Map<string, CompetitorTopics["topics"]>();
+  for (const gap of gaps) {
+    for (const competitor of gap.accounts) {
+      byCompetitor.set(competitor, [
+        ...(byCompetitor.get(competitor) ?? []),
+        { topic: gap.topic, medianLift: gap.medianLift, postCount: gap.postCount },
+      ]);
+    }
+  }
+  return [...byCompetitor]
+    .map(([competitor, topics]) => ({
+      competitor,
+      topics: [...topics]
+        .sort((a, b) => b.medianLift - a.medianLift || b.postCount - a.postCount || a.topic.localeCompare(b.topic))
+        .slice(0, perCompetitor),
+    }))
+    .sort((a, b) => b.topics[0].medianLift - a.topics[0].medianLift || a.competitor.localeCompare(b.competitor));
+}
+
 type Page<T> = PromiseLike<{ data: T[] | null; error: { message: string } | null }>;
 
 async function fetchAll<T>(what: string, page: (from: number, to: number) => Page<T>): Promise<T[]> {
@@ -144,5 +175,5 @@ export async function getTopicGaps(analysisId: string): Promise<TopicGapsResult 
     for (const n of nodes) topicNames[n.id] = n.name;
   }
 
-  return computeTopicGaps({ targetIds, rivalIds, accountNames, topicNames, posts, about });
+  return computeTopicGaps({ targetIds, rivalIds, accountNames, topicNames, posts, about }, Infinity);
 }

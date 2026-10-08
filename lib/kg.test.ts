@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTopicGaps, type TopicGapInput } from "./kg";
+import { computeTopicGaps, groupGapsByCompetitor, type TopicGapInput } from "./kg";
 
 const base: TopicGapInput = {
   targetIds: ["account:instagram:acme"],
@@ -78,4 +78,25 @@ test("a post with no lift counts as zero, matching the Python query", () => {
     ]),
   );
   assert.deepEqual(gaps, []);
+});
+
+test("groupGapsByCompetitor makes one entry per competitor, strongest first", () => {
+  const grouped = groupGapsByCompetitor([
+    { topic: "photo backup", medianLift: 1.4, postCount: 4, accounts: ["@rivalco"] },
+    { topic: "phone cleanup", medianLift: 2.5, postCount: 6, accounts: ["@other", "@rivalco"] },
+    { topic: "backing up photos", medianLift: 1.2, postCount: 3, accounts: ["@rivalco"] },
+  ]);
+  assert.deepEqual(
+    grouped.map((c) => [c.competitor, c.topics.map((t) => t.topic)]),
+    [
+      ["@other", ["phone cleanup"]],
+      ["@rivalco", ["phone cleanup", "photo backup", "backing up photos"]],
+    ],
+  );
+});
+
+test("groupGapsByCompetitor keeps only the top topics per competitor", () => {
+  const gaps = [1, 2, 3, 4, 5].map((n) => ({ topic: `t${n}`, medianLift: n, postCount: 3, accounts: ["@rivalco"] }));
+  assert.deepEqual(groupGapsByCompetitor(gaps, 2)[0].topics.map((t) => t.topic), ["t5", "t4"]);
+  assert.deepEqual(groupGapsByCompetitor([]), []);
 });
